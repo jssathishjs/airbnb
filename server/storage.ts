@@ -7,8 +7,7 @@ import {
   type Location, type InsertLocation, type Review, type InsertReview,
   type PropertyWithDetails
 } from "@shared/schema";
-import { db } from "./db";
-import { and, eq, gte, lte, like, inArray, desc, sql } from "drizzle-orm";
+import { supabase } from "./supabase";
 
 export interface IStorage {
   // Property operations
@@ -143,8 +142,8 @@ export class MemStorage implements IStorage {
         title: "Luxury Beachfront Villa",
         description: "Experience luxury living in this spectacular beachfront villa with panoramic ocean views. This spacious property offers modern amenities while maintaining a cozy atmosphere for your perfect getaway.",
         location: "Malibu, California",
-        price: 350,
-        rating: 4.9,
+        price: "350",
+        rating: "4.9",
         bedrooms: 4,
         bathrooms: 3,
         mainImage: "https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
@@ -154,8 +153,8 @@ export class MemStorage implements IStorage {
         title: "Modern Downtown Apartment",
         description: "Stay in this sleek and stylish apartment in the heart of downtown. Enjoy stunning city views and easy access to all the best restaurants, shopping, and entertainment.",
         location: "New York, New York",
-        price: 180,
-        rating: 4.7,
+        price: "180",
+        rating: "4.7",
         bedrooms: 2,
         bathrooms: 2,
         mainImage: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
@@ -165,8 +164,8 @@ export class MemStorage implements IStorage {
         title: "Cozy Mountain Cabin",
         description: "Escape to this charming cabin nestled in the mountains. Perfect for a peaceful retreat with beautiful views and outdoor activities right at your doorstep.",
         location: "Aspen, Colorado",
-        price: 230,
-        rating: 4.8,
+        price: "230",
+        rating: "4.8",
         bedrooms: 3,
         bathrooms: 2,
         mainImage: "https://images.unsplash.com/photo-1480074568708-e7b720bb3f09?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
@@ -176,8 +175,8 @@ export class MemStorage implements IStorage {
         title: "Lakefront Cottage",
         description: "Experience tranquility at this beautiful lakefront cottage. Wake up to stunning lake views and enjoy direct access to water activities and hiking trails.",
         location: "Lake Tahoe, Nevada",
-        price: 275,
-        rating: 4.9,
+        price: "275",
+        rating: "4.9",
         bedrooms: 4,
         bathrooms: 2,
         mainImage: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
@@ -187,8 +186,8 @@ export class MemStorage implements IStorage {
         title: "Luxury Poolside Villa",
         description: "Indulge in luxury at this elegant villa with a private pool. Perfect for those seeking privacy and comfort in a beautiful setting.",
         location: "Miami, Florida",
-        price: 420,
-        rating: 5.0,
+        price: "420",
+        rating: "5.0",
         bedrooms: 5,
         bathrooms: 4,
         mainImage: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
@@ -198,8 +197,8 @@ export class MemStorage implements IStorage {
         title: "Urban Studio Loft",
         description: "Stay in this trendy loft in the heart of the city. Great for solo travelers or couples looking to experience urban living at its finest.",
         location: "Chicago, Illinois",
-        price: 150,
-        rating: 4.6,
+        price: "150",
+        rating: "4.6",
         bedrooms: 1,
         bathrooms: 1,
         mainImage: "https://images.unsplash.com/photo-1493809842364-78817add7ffb?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
@@ -209,8 +208,8 @@ export class MemStorage implements IStorage {
         title: "Secluded Forest Retreat",
         description: "Find peace and quiet in this secluded cabin surrounded by forest. Perfect for nature lovers and those seeking to unplug.",
         location: "Portland, Oregon",
-        price: 195,
-        rating: 4.7,
+        price: "195",
+        rating: "4.7",
         bedrooms: 2,
         bathrooms: 1,
         mainImage: "https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
@@ -220,8 +219,8 @@ export class MemStorage implements IStorage {
         title: "Charming Historic Townhouse",
         description: "Experience the charm of this beautifully renovated historic townhouse. Combining classic architecture with modern amenities.",
         location: "Boston, Massachusetts",
-        price: 240,
-        rating: 4.8,
+        price: "240",
+        rating: "4.8",
         bedrooms: 3,
         bathrooms: 2,
         mainImage: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
@@ -550,17 +549,34 @@ export class MemStorage implements IStorage {
   }
 }
 
-export class DatabaseStorage implements IStorage {
+export class SupabaseStorage implements IStorage {
   // Property operations
   async getProperties(): Promise<Property[]> {
-    return db.select().from(properties);
+    const { data, error } = await supabase
+      .from('properties')
+      .select('*');
+    
+    if (error) {
+      console.error('Error fetching properties:', error);
+      return [];
+    }
+    
+    return data as Property[];
   }
   
   async getProperty(id: number): Promise<PropertyWithDetails | undefined> {
-    const [property] = await db.select().from(properties).where(eq(properties.id, id));
+    const { data, error } = await supabase
+      .from('properties')
+      .select('*')
+      .eq('id', id)
+      .single();
     
-    if (!property) return undefined;
+    if (error || !data) {
+      console.error('Error fetching property:', error);
+      return undefined;
+    }
     
+    const property = data as Property;
     const images = await this.getPropertyImages(id);
     const amenities = await this.getPropertyAmenities(id);
     const reviews = await this.getPropertyReviews(id);
@@ -574,10 +590,18 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getFeaturedProperties(limit = 6): Promise<Property[]> {
-    return db.select()
-      .from(properties)
-      .where(eq(properties.isFeatured, true))
+    const { data, error } = await supabase
+      .from('properties')
+      .select('*')
+      .eq('is_featured', true)
       .limit(limit);
+    
+    if (error) {
+      console.error('Error fetching featured properties:', error);
+      return [];
+    }
+    
+    return data as Property[];
   }
   
   async searchProperties(searchParams: {
@@ -590,175 +614,346 @@ export class DatabaseStorage implements IStorage {
     bathrooms?: number;
     amenities?: number[];
   }): Promise<Property[]> {
-    let query = db.select().from(properties);
-    const conditions = [];
+    let query = supabase.from('properties').select('*');
     
     if (searchParams.location) {
-      conditions.push(like(properties.location, `%${searchParams.location}%`));
+      query = query.ilike('location', `%${searchParams.location}%`);
     }
     
     if (searchParams.minPrice !== undefined) {
-      conditions.push(gte(properties.price, searchParams.minPrice.toString()));
+      query = query.gte('price', searchParams.minPrice.toString());
     }
     
     if (searchParams.maxPrice !== undefined) {
-      conditions.push(lte(properties.price, searchParams.maxPrice.toString()));
+      query = query.lte('price', searchParams.maxPrice.toString());
     }
     
     if (searchParams.bedrooms !== undefined) {
-      conditions.push(gte(properties.bedrooms, searchParams.bedrooms));
+      query = query.gte('bedrooms', searchParams.bedrooms);
     }
     
     if (searchParams.bathrooms !== undefined) {
-      conditions.push(gte(properties.bathrooms, searchParams.bathrooms));
+      query = query.gte('bathrooms', searchParams.bathrooms);
     }
     
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+    const { data: properties, error } = await query;
+    
+    if (error) {
+      console.error('Error searching properties:', error);
+      return [];
     }
     
-    let filteredProperties = await query;
+    let filteredProperties = properties as Property[];
     
-    // Handle amenities filter with a separate query
+    // Handle amenities filter
     if (searchParams.amenities && searchParams.amenities.length > 0) {
-      const propertyAmenitiesResults = await db.select({
-        propertyId: propertyAmenities.propertyId,
-        amenityCount: sql<number>`count(${propertyAmenities.amenityId})`
-      })
-      .from(propertyAmenities)
-      .where(inArray(propertyAmenities.amenityId, searchParams.amenities))
-      .groupBy(propertyAmenities.propertyId)
-      .having(sql`count(${propertyAmenities.amenityId}) = ${searchParams.amenities.length}`);
+      // Get all properties that have ALL the requested amenities
+      const { data: propertyAmenityData, error: paError } = await supabase
+        .from('property_amenities')
+        .select('property_id, amenity_id');
       
-      const propertyIds = propertyAmenitiesResults.map(pa => pa.propertyId);
-      filteredProperties = filteredProperties.filter(p => propertyIds.includes(p.id));
+      if (paError) {
+        console.error('Error fetching property amenities:', paError);
+      } else {
+        // Group by property_id and count amenities
+        const propertyAmenityMap = new Map<number, Set<number>>();
+        
+        for (const pa of propertyAmenityData) {
+          const propertyId = pa.property_id;
+          const amenityId = pa.amenity_id;
+          
+          if (!propertyAmenityMap.has(propertyId)) {
+            propertyAmenityMap.set(propertyId, new Set());
+          }
+          
+          propertyAmenityMap.get(propertyId)?.add(amenityId);
+        }
+        
+        // Filter properties that have all required amenities
+        filteredProperties = filteredProperties.filter(property => {
+          const propertyAmenities = propertyAmenityMap.get(property.id);
+          if (!propertyAmenities) return false;
+          
+          return searchParams.amenities!.every(amenityId => 
+            propertyAmenities.has(amenityId)
+          );
+        });
+      }
     }
     
-    // Handle availability with a separate query
+    // Handle availability check
     if (searchParams.checkIn && searchParams.checkOut) {
-      const unavailablePropertyIds = await db.select({ propertyId: bookings.propertyId })
-        .from(bookings)
-        .where(
-          and(
-            // Check if requested dates overlap with any existing booking
-            // (checkIn <= existing.checkOut && checkOut >= existing.checkIn)
-            lte(bookings.checkIn, searchParams.checkOut),
-            gte(bookings.checkOut, searchParams.checkIn)
-          )
-        )
-        .then(results => results.map(r => r.propertyId));
+      const { data: bookingsData, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('property_id, check_in, check_out');
       
-      filteredProperties = filteredProperties.filter(p => !unavailablePropertyIds.includes(p.id));
+      if (bookingsError) {
+        console.error('Error fetching bookings:', bookingsError);
+      } else {
+        const checkIn = searchParams.checkIn;
+        const checkOut = searchParams.checkOut;
+        
+        // Get all properties that have overlapping bookings
+        const unavailablePropertyIds = new Set<number>();
+        
+        for (const booking of bookingsData) {
+          const bookingCheckIn = new Date(booking.check_in);
+          const bookingCheckOut = new Date(booking.check_out);
+          
+          // Check if dates overlap
+          if (checkIn <= bookingCheckOut && checkOut >= bookingCheckIn) {
+            unavailablePropertyIds.add(booking.property_id);
+          }
+        }
+        
+        // Filter out unavailable properties
+        filteredProperties = filteredProperties.filter(
+          property => !unavailablePropertyIds.has(property.id)
+        );
+      }
     }
     
     return filteredProperties;
   }
   
   async createProperty(property: InsertProperty): Promise<Property> {
-    const [newProperty] = await db.insert(properties).values(property).returning();
-    return newProperty;
+    const { data, error } = await supabase
+      .from('properties')
+      .insert(property)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating property:', error);
+      throw new Error(`Failed to create property: ${error.message}`);
+    }
+    
+    return data as Property;
   }
   
   // Property images
   async getPropertyImages(propertyId: number): Promise<PropertyImage[]> {
-    return db.select()
-      .from(propertyImages)
-      .where(eq(propertyImages.propertyId, propertyId));
+    const { data, error } = await supabase
+      .from('property_images')
+      .select('*')
+      .eq('property_id', propertyId);
+    
+    if (error) {
+      console.error('Error fetching property images:', error);
+      return [];
+    }
+    
+    return data as PropertyImage[];
   }
   
   async addPropertyImage(image: InsertPropertyImage): Promise<PropertyImage> {
-    const [newImage] = await db.insert(propertyImages).values(image).returning();
-    return newImage;
+    const { data, error } = await supabase
+      .from('property_images')
+      .insert(image)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error adding property image:', error);
+      throw new Error(`Failed to add property image: ${error.message}`);
+    }
+    
+    return data as PropertyImage;
   }
   
   // Amenities
   async getAmenities(): Promise<Amenity[]> {
-    return db.select().from(amenities);
+    const { data, error } = await supabase
+      .from('amenities')
+      .select('*');
+    
+    if (error) {
+      console.error('Error fetching amenities:', error);
+      return [];
+    }
+    
+    return data as Amenity[];
   }
   
   async getPropertyAmenities(propertyId: number): Promise<Amenity[]> {
-    const result = await db.select({
-      amenity: amenities
-    })
-    .from(propertyAmenities)
-    .innerJoin(amenities, eq(propertyAmenities.amenityId, amenities.id))
-    .where(eq(propertyAmenities.propertyId, propertyId));
+    const { data: propertyAmenityData, error: paError } = await supabase
+      .from('property_amenities')
+      .select('amenity_id')
+      .eq('property_id', propertyId);
     
-    return result.map(r => r.amenity);
+    if (paError) {
+      console.error('Error fetching property amenity relationships:', paError);
+      return [];
+    }
+    
+    if (!propertyAmenityData || propertyAmenityData.length === 0) {
+      return [];
+    }
+    
+    const amenityIds = propertyAmenityData.map(pa => pa.amenity_id);
+    
+    const { data: amenitiesData, error: amenitiesError } = await supabase
+      .from('amenities')
+      .select('*')
+      .in('id', amenityIds);
+    
+    if (amenitiesError) {
+      console.error('Error fetching amenities:', amenitiesError);
+      return [];
+    }
+    
+    return amenitiesData as Amenity[];
   }
   
   async addAmenity(amenity: InsertAmenity): Promise<Amenity> {
-    const [newAmenity] = await db.insert(amenities).values(amenity).returning();
-    return newAmenity;
+    const { data, error } = await supabase
+      .from('amenities')
+      .insert(amenity)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error adding amenity:', error);
+      throw new Error(`Failed to add amenity: ${error.message}`);
+    }
+    
+    return data as Amenity;
   }
   
   async addPropertyAmenity(propertyAmenity: InsertPropertyAmenity): Promise<PropertyAmenity> {
-    const [newPropertyAmenity] = await db.insert(propertyAmenities).values(propertyAmenity).returning();
-    return newPropertyAmenity;
+    const { data, error } = await supabase
+      .from('property_amenities')
+      .insert(propertyAmenity)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error adding property amenity:', error);
+      throw new Error(`Failed to add property amenity: ${error.message}`);
+    }
+    
+    return data as PropertyAmenity;
   }
   
   // Bookings
   async createBooking(booking: InsertBooking): Promise<Booking> {
-    const [newBooking] = await db.insert(bookings).values(booking).returning();
-    return newBooking;
+    const { data, error } = await supabase
+      .from('bookings')
+      .insert(booking)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating booking:', error);
+      throw new Error(`Failed to create booking: ${error.message}`);
+    }
+    
+    return data as Booking;
   }
   
   async getPropertyBookings(propertyId: number): Promise<Booking[]> {
-    return db.select()
-      .from(bookings)
-      .where(eq(bookings.propertyId, propertyId));
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('property_id', propertyId);
+    
+    if (error) {
+      console.error('Error fetching property bookings:', error);
+      return [];
+    }
+    
+    return data as Booking[];
   }
   
   async checkAvailability(propertyId: number, checkIn: Date, checkOut: Date): Promise<boolean> {
-    const overlappingBookings = await db.select({ count: sql<number>`count(*)` })
-      .from(bookings)
-      .where(
-        and(
-          eq(bookings.propertyId, propertyId),
-          lte(bookings.checkIn, checkOut),
-          gte(bookings.checkOut, checkIn)
-        )
-      );
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('property_id', propertyId)
+      .lte('check_in', checkOut.toISOString().split('T')[0])
+      .gte('check_out', checkIn.toISOString().split('T')[0]);
     
-    return overlappingBookings[0].count === 0;
+    if (error) {
+      console.error('Error checking availability:', error);
+      return false;
+    }
+    
+    return data.length === 0;
   }
   
   // Contacts
   async createContact(contact: InsertContact): Promise<Contact> {
-    const [newContact] = await db.insert(contacts).values(contact).returning();
-    return newContact;
+    const { data, error } = await supabase
+      .from('contacts')
+      .insert(contact)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating contact:', error);
+      throw new Error(`Failed to create contact: ${error.message}`);
+    }
+    
+    return data as Contact;
   }
   
   // Locations
   async getLocations(): Promise<Location[]> {
-    return db.select().from(locations);
+    const { data, error } = await supabase
+      .from('locations')
+      .select('*');
+    
+    if (error) {
+      console.error('Error fetching locations:', error);
+      return [];
+    }
+    
+    return data as Location[];
   }
   
   // Reviews
   async getPropertyReviews(propertyId: number): Promise<Review[]> {
-    return db.select()
-      .from(reviews)
-      .where(eq(reviews.propertyId, propertyId))
-      .orderBy(desc(reviews.date));
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('*')
+      .eq('property_id', propertyId)
+      .order('date', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching property reviews:', error);
+      return [];
+    }
+    
+    return data as Review[];
   }
   
   async addReview(review: InsertReview): Promise<Review> {
-    const [newReview] = await db.insert(reviews).values(review).returning();
+    const { data, error } = await supabase
+      .from('reviews')
+      .insert(review)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error adding review:', error);
+      throw new Error(`Failed to add review: ${error.message}`);
+    }
     
     // Update the property's review count and average rating
-    const allReviews = await this.getPropertyReviews(review.propertyId);
-    const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
+    const propertyReviews = await this.getPropertyReviews(review.propertyId);
+    const avgRating = propertyReviews.reduce((sum, r) => sum + r.rating, 0) / propertyReviews.length;
     
-    await db.update(properties)
-      .set({
-        reviewCount: allReviews.length,
+    await supabase
+      .from('properties')
+      .update({
+        review_count: propertyReviews.length,
         rating: avgRating.toFixed(1)
       })
-      .where(eq(properties.id, review.propertyId));
+      .eq('id', review.propertyId);
     
-    return newReview;
+    return data as Review;
   }
 }
 
-// Use the DatabaseStorage implementation instead of MemStorage
-export const storage = new DatabaseStorage();
+// Use the SupabaseStorage implementation
+export const storage = new SupabaseStorage();

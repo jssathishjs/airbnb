@@ -9,8 +9,8 @@ export const properties = pgTable("properties", {
   title: text("title").notNull(),
   description: text("description").notNull(),
   location: text("location").notNull(),
-  price: numeric("price").notNull(),
-  rating: numeric("rating"),
+  price: text("price").notNull(),  // Stored as text for compatibility with Supabase
+  rating: text("rating"),          // Stored as text for compatibility with Supabase
   reviewCount: integer("review_count").default(0),
   bedrooms: integer("bedrooms").notNull(),
   bathrooms: integer("bathrooms").notNull(),
