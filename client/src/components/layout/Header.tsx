@@ -1,104 +1,102 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Menu, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
-const Header = () => {
-  const [isOpen, setIsOpen] = useState(false);
+const navItems = [
+  { label: "Home", path: "/" },
+  { label: "Properties", path: "/properties" },
+  { label: "How It Works", path: "/how-it-works" },
+  { label: "About", path: "/about" },
+];
+
+export default function Header() {
   const [location] = useLocation();
+  const [isScrolled, setIsScrolled] = useState(false);
 
-  const toggleMenu = () => {
-    setIsOpen(!isOpen);
-  };
+  // Add scroll event listener when component mounts
+  if (typeof window !== "undefined") {
+    window.addEventListener("scroll", () => {
+      if (window.scrollY > 10) {
+        setIsScrolled(true);
+      } else {
+        setIsScrolled(false);
+      }
+    });
+  }
 
   return (
-    <header className="sticky top-0 bg-white shadow-sm z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center">
-            <Link href="/" className="flex-shrink-0">
-              <span className="text-primary font-bold text-2xl">StaySpaces</span>
+    <header className={cn(
+      "sticky top-0 z-50 w-full transition-all duration-200",
+      isScrolled 
+        ? "bg-white shadow-sm" 
+        : "bg-white/80 backdrop-blur-sm"
+    )}>
+      <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <Link href="/" className="flex items-center">
+          <span className="text-primary text-2xl font-bold">StayVista</span>
+        </Link>
+
+        {/* Desktop Navigation */}
+        <nav className="hidden md:flex space-x-8 items-center">
+          {navItems.map((item) => (
+            <Link
+              key={item.path}
+              href={item.path}
+              className={cn(
+                "text-foreground hover:text-primary font-medium transition",
+                location === item.path && "text-primary"
+              )}
+            >
+              {item.label}
             </Link>
-          </div>
-          <nav className="hidden md:flex space-x-8">
-            <Link href="/">
-              <a className={`px-3 py-2 font-medium ${location === "/" ? "text-primary" : "text-gray-800 hover:text-primary"}`}>
-                Home
-              </a>
-            </Link>
-            <Link href="/properties">
-              <a className={`px-3 py-2 font-medium ${location === "/properties" ? "text-primary" : "text-gray-800 hover:text-primary"}`}>
-                Properties
-              </a>
-            </Link>
-            <Link href="/about">
-              <a className={`px-3 py-2 font-medium ${location === "/about" ? "text-primary" : "text-gray-800 hover:text-primary"}`}>
-                About Us
-              </a>
-            </Link>
-            <Link href="/contact">
-              <a className={`px-3 py-2 font-medium ${location === "/contact" ? "text-primary" : "text-gray-800 hover:text-primary"}`}>
-                Contact
-              </a>
-            </Link>
-          </nav>
-          <div className="hidden md:flex items-center space-x-4">
-            <Button variant="ghost" className="text-gray-800 font-medium">Login</Button>
-            <Button className="bg-primary text-white hover:bg-primary/90">Sign Up</Button>
-          </div>
-          <div className="md:hidden flex items-center">
-            <Button variant="ghost" onClick={toggleMenu} size="icon">
-              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          ))}
+          <Link href="/contact">
+            <Button className="bg-primary text-white hover:bg-primary/90 transition">
+              List Your Property
             </Button>
-          </div>
+          </Link>
+        </nav>
+
+        {/* Mobile Navigation */}
+        <div className="md:hidden">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Menu className="h-6 w-6" />
+                <span className="sr-only">Open menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right">
+              <div className="flex flex-col space-y-4 mt-8">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.path}
+                    href={item.path}
+                    className={cn(
+                      "text-foreground hover:text-primary font-medium text-lg py-2 transition",
+                      location === item.path && "text-primary"
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+                <Link href="/contact">
+                  <Button className="w-full mt-4 bg-primary text-white hover:bg-primary/90 transition">
+                    List Your Property
+                  </Button>
+                </Link>
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
-      
-      {/* Mobile menu */}
-      {isOpen && (
-        <div className="md:hidden bg-white border-b border-gray-200">
-          <div className="px-2 pt-2 pb-3 space-y-1">
-            <Link href="/">
-              <a 
-                className={`block px-3 py-2 text-base font-medium ${location === "/" ? "text-primary" : "text-gray-800 hover:bg-gray-50"}`}
-                onClick={() => setIsOpen(false)}
-              >
-                Home
-              </a>
-            </Link>
-            <Link href="/properties">
-              <a 
-                className={`block px-3 py-2 text-base font-medium ${location === "/properties" ? "text-primary" : "text-gray-800 hover:bg-gray-50"}`}
-                onClick={() => setIsOpen(false)}
-              >
-                Properties
-              </a>
-            </Link>
-            <Link href="/about">
-              <a 
-                className={`block px-3 py-2 text-base font-medium ${location === "/about" ? "text-primary" : "text-gray-800 hover:bg-gray-50"}`}
-                onClick={() => setIsOpen(false)}
-              >
-                About Us
-              </a>
-            </Link>
-            <Link href="/contact">
-              <a 
-                className={`block px-3 py-2 text-base font-medium ${location === "/contact" ? "text-primary" : "text-gray-800 hover:bg-gray-50"}`}
-                onClick={() => setIsOpen(false)}
-              >
-                Contact
-              </a>
-            </Link>
-            <div className="flex space-x-2 mt-3 px-3">
-              <Button variant="outline" className="flex-1 text-gray-800 border-gray-300 hover:bg-gray-50">Login</Button>
-              <Button className="flex-1 bg-primary text-white hover:bg-primary/90">Sign Up</Button>
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   );
-};
-
-export default Header;
+}

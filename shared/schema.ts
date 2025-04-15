@@ -1,19 +1,8 @@
-import { pgTable, text, serial, integer, boolean, json, date, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, date, timestamp, varchar, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Users table
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  email: text("email").notNull(),
-  fullName: text("full_name").notNull(),
-  avatarUrl: text("avatar_url"),
-  createdAt: date("created_at").defaultNow().notNull(),
-});
-
-// Properties table
+// Property schema
 export const properties = pgTable("properties", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
@@ -24,128 +13,137 @@ export const properties = pgTable("properties", {
   reviewCount: integer("review_count").default(0),
   bedrooms: integer("bedrooms").notNull(),
   bathrooms: integer("bathrooms").notNull(),
-  maxGuests: integer("max_guests").notNull(),
-  imageUrls: json("image_urls").$type<string[]>().notNull().default([]),
-  amenities: json("amenities").$type<string[]>().notNull().default([]),
-  hostId: integer("host_id").notNull(),
-  isNew: boolean("is_new").default(false),
-  latitude: numeric("latitude"),
-  longitude: numeric("longitude"),
-  createdAt: date("created_at").defaultNow().notNull(),
-  type: text("type").notNull().default("apartment"),
+  mainImage: text("main_image").notNull(),
+  isFeatured: boolean("is_featured").default(false),
 });
 
-// Bookings table
-export const bookings = pgTable("bookings", {
-  id: serial("id").primaryKey(),
-  propertyId: integer("property_id").notNull(),
-  userId: integer("user_id").notNull(),
-  startDate: date("start_date").notNull(),
-  endDate: date("end_date").notNull(),
-  totalPrice: numeric("total_price").notNull(),
-  status: text("status").notNull().default("pending"),
-  customizations: json("customizations").$type<{ id: string; name: string; price: number }[]>().default([]),
-  createdAt: date("created_at").defaultNow().notNull(),
+export const insertPropertySchema = createInsertSchema(properties).omit({
+  id: true,
+  reviewCount: true,
 });
 
-// Reviews table
-export const reviews = pgTable("reviews", {
+// Property images schema
+export const propertyImages = pgTable("property_images", {
   id: serial("id").primaryKey(),
   propertyId: integer("property_id").notNull(),
-  userId: integer("user_id").notNull(),
-  rating: integer("rating").notNull(),
-  comment: text("comment").notNull(),
-  createdAt: date("created_at").defaultNow().notNull(),
+  imageUrl: text("image_url").notNull(),
 });
 
-// Customization options table
-export const customizationOptions = pgTable("customization_options", {
+export const insertPropertyImageSchema = createInsertSchema(propertyImages).omit({
+  id: true,
+});
+
+// Amenities schema
+export const amenities = pgTable("amenities", {
   id: serial("id").primaryKey(),
-  propertyId: integer("property_id").notNull(),
   name: text("name").notNull(),
-  description: text("description").notNull(),
-  price: numeric("price").notNull(),
   icon: text("icon").notNull(),
 });
 
-// Messages table
-export const messages = pgTable("messages", {
+export const insertAmenitySchema = createInsertSchema(amenities).omit({
+  id: true,
+});
+
+// Property amenities relation schema
+export const propertyAmenities = pgTable("property_amenities", {
   id: serial("id").primaryKey(),
-  senderId: integer("sender_id").notNull(),
-  receiverId: integer("receiver_id").notNull(),
   propertyId: integer("property_id").notNull(),
-  content: text("content").notNull(),
-  createdAt: date("created_at").defaultNow().notNull(),
-  isRead: boolean("is_read").default(false),
+  amenityId: integer("amenity_id").notNull(),
 });
 
-// Locations/Destinations table
-export const destinations = pgTable("destinations", {
+export const insertPropertyAmenitySchema = createInsertSchema(propertyAmenities).omit({
+  id: true,
+});
+
+// Bookings schema
+export const bookings = pgTable("bookings", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  imageUrl: text("image_url").notNull(),
-  propertyCount: integer("property_count").default(0),
+  propertyId: integer("property_id").notNull(),
+  checkIn: date("check_in").notNull(),
+  checkOut: date("check_out").notNull(),
+  guestName: text("guest_name").notNull(),
+  guestEmail: text("guest_email").notNull(),
+  guestPhone: text("guest_phone"),
+  totalPrice: numeric("total_price").notNull(),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Schema for inserting users
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-});
-
-// Schema for inserting properties
-export const insertPropertySchema = createInsertSchema(properties).omit({
-  id: true,
-  createdAt: true,
-});
-
-// Schema for inserting bookings
 export const insertBookingSchema = createInsertSchema(bookings).omit({
   id: true,
   createdAt: true,
 });
 
-// Schema for inserting reviews
+// Contact schema
+export const contacts = pgTable("contacts", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  propertyId: integer("property_id"),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertContactSchema = createInsertSchema(contacts).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Location schema for filtering
+export const locations = pgTable("locations", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // city, state, country, etc.
+});
+
+export const insertLocationSchema = createInsertSchema(locations).omit({
+  id: true,
+});
+
+// Reviews schema
+export const reviews = pgTable("reviews", {
+  id: serial("id").primaryKey(),
+  propertyId: integer("property_id").notNull(),
+  guestName: text("guest_name").notNull(),
+  rating: integer("rating").notNull(),
+  comment: text("comment").notNull(),
+  date: timestamp("date").defaultNow(),
+  avatar: text("avatar").default("/avatars/default.png"),
+});
+
 export const insertReviewSchema = createInsertSchema(reviews).omit({
   id: true,
-  createdAt: true,
+  date: true,
 });
 
-// Schema for inserting customization options
-export const insertCustomizationOptionSchema = createInsertSchema(customizationOptions).omit({
-  id: true,
-});
-
-// Schema for inserting messages
-export const insertMessageSchema = createInsertSchema(messages).omit({
-  id: true,
-  createdAt: true,
-  isRead: true,
-});
-
-// Schema for inserting destinations
-export const insertDestinationSchema = createInsertSchema(destinations).omit({
-  id: true,
-});
-
-// Types for insertion and selection
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
-
-export type InsertProperty = z.infer<typeof insertPropertySchema>;
+// Type definitions
 export type Property = typeof properties.$inferSelect;
+export type InsertProperty = z.infer<typeof insertPropertySchema>;
 
-export type InsertBooking = z.infer<typeof insertBookingSchema>;
+export type PropertyImage = typeof propertyImages.$inferSelect;
+export type InsertPropertyImage = z.infer<typeof insertPropertyImageSchema>;
+
+export type Amenity = typeof amenities.$inferSelect;
+export type InsertAmenity = z.infer<typeof insertAmenitySchema>;
+
+export type PropertyAmenity = typeof propertyAmenities.$inferSelect;
+export type InsertPropertyAmenity = z.infer<typeof insertPropertyAmenitySchema>;
+
 export type Booking = typeof bookings.$inferSelect;
+export type InsertBooking = z.infer<typeof insertBookingSchema>;
 
-export type InsertReview = z.infer<typeof insertReviewSchema>;
+export type Contact = typeof contacts.$inferSelect;
+export type InsertContact = z.infer<typeof insertContactSchema>;
+
+export type Location = typeof locations.$inferSelect;
+export type InsertLocation = z.infer<typeof insertLocationSchema>;
+
 export type Review = typeof reviews.$inferSelect;
+export type InsertReview = z.infer<typeof insertReviewSchema>;
 
-export type InsertCustomizationOption = z.infer<typeof insertCustomizationOptionSchema>;
-export type CustomizationOption = typeof customizationOptions.$inferSelect;
-
-export type InsertMessage = z.infer<typeof insertMessageSchema>;
-export type Message = typeof messages.$inferSelect;
-
-export type InsertDestination = z.infer<typeof insertDestinationSchema>;
-export type Destination = typeof destinations.$inferSelect;
+// Extended types for API responses
+export type PropertyWithDetails = Property & {
+  images: PropertyImage[];
+  amenities: Amenity[];
+  reviews: Review[];
+};

@@ -1,17 +1,23 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { 
+  insertBookingSchema, 
+  insertContactSchema,
+  insertReviewSchema
+} from "@shared/schema";
 import { z } from "zod";
-import { insertPropertySchema, insertBookingSchema, insertReviewSchema, insertMessageSchema } from "@shared/schema";
+import { ZodError } from "zod";
+import { fromZodError } from "zod-validation-error";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Properties
+  // API routes
   app.get("/api/properties", async (req: Request, res: Response) => {
     try {
-      const properties = await storage.getAllProperties();
+      const properties = await storage.getProperties();
       res.json(properties);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch properties" });
+      res.status(500).json({ error: "Failed to fetch properties" });
     }
   });
 
@@ -21,225 +27,193 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const properties = await storage.getFeaturedProperties(limit);
       res.json(properties);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch featured properties" });
-    }
-  });
-
-  app.get("/api/properties/recent", async (req: Request, res: Response) => {
-    try {
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : 3;
-      const properties = await storage.getRecentProperties(limit);
-      res.json(properties);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch recent properties" });
+      res.status(500).json({ error: "Failed to fetch featured properties" });
     }
   });
 
   app.get("/api/properties/:id", async (req: Request, res: Response) => {
     try {
-      const propertyId = parseInt(req.params.id);
-      const property = await storage.getProperty(propertyId);
+      const id = parseInt(req.params.id);
+      const property = await storage.getProperty(id);
       
       if (!property) {
-        return res.status(404).json({ message: "Property not found" });
+        return res.status(404).json({ error: "Property not found" });
       }
       
       res.json(property);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch property" });
+      res.status(500).json({ error: "Failed to fetch property details" });
     }
   });
 
-  app.post("/api/properties/search", async (req: Request, res: Response) => {
+  app.get("/api/properties/search", async (req: Request, res: Response) => {
     try {
-      const { location, startDate, endDate, guests, minPrice, maxPrice, amenities, type } = req.body;
+      const { 
+        location, 
+        checkIn, 
+        checkOut, 
+        minPrice, 
+        maxPrice, 
+        bedrooms, 
+        bathrooms, 
+        amenities 
+      } = req.query;
       
-      // Convert dates to Date objects if they're provided
-      const searchParams = {
-        location,
-        startDate: startDate ? new Date(startDate) : undefined,
-        endDate: endDate ? new Date(endDate) : undefined,
-        guests: guests ? parseInt(guests) : undefined,
-        minPrice: minPrice ? parseFloat(minPrice) : undefined,
-        maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
-        amenities,
-        type
-      };
+      const searchParams: any = {};
+      
+      if (location) searchParams.location = location as string;
+      if (minPrice) searchParams.minPrice = parseInt(minPrice as string);
+      if (maxPrice) searchParams.maxPrice = parseInt(maxPrice as string);
+      if (bedrooms) searchParams.bedrooms = parseInt(bedrooms as string);
+      if (bathrooms) searchParams.bathrooms = parseInt(bathrooms as string);
+      
+      if (checkIn && checkOut) {
+        searchParams.checkIn = new Date(checkIn as string);
+        searchParams.checkOut = new Date(checkOut as string);
+      }
+      
+      if (amenities) {
+        searchParams.amenities = (amenities as string)
+          .split(',')
+          .map(id => parseInt(id));
+      }
       
       const properties = await storage.searchProperties(searchParams);
       res.json(properties);
     } catch (error) {
-      res.status(500).json({ message: "Failed to search properties" });
+      res.status(500).json({ error: "Failed to search properties" });
     }
   });
 
-  app.post("/api/properties", async (req: Request, res: Response) => {
+  app.get("/api/properties/:id/images", async (req: Request, res: Response) => {
     try {
-      const result = insertPropertySchema.safeParse(req.body);
-      
-      if (!result.success) {
-        return res.status(400).json({ message: "Invalid property data", errors: result.error.format() });
-      }
-      
-      const property = await storage.createProperty(result.data);
-      res.status(201).json(property);
+      const id = parseInt(req.params.id);
+      const images = await storage.getPropertyImages(id);
+      res.json(images);
     } catch (error) {
-      res.status(500).json({ message: "Failed to create property" });
+      res.status(500).json({ error: "Failed to fetch property images" });
     }
   });
 
-  // Bookings
-  app.post("/api/bookings", async (req: Request, res: Response) => {
+  app.get("/api/properties/:id/amenities", async (req: Request, res: Response) => {
     try {
-      const result = insertBookingSchema.safeParse(req.body);
-      
-      if (!result.success) {
-        return res.status(400).json({ message: "Invalid booking data", errors: result.error.format() });
-      }
-      
-      const booking = await storage.createBooking(result.data);
-      res.status(201).json(booking);
+      const id = parseInt(req.params.id);
+      const amenities = await storage.getPropertyAmenities(id);
+      res.json(amenities);
     } catch (error) {
-      res.status(500).json({ message: "Failed to create booking" });
+      res.status(500).json({ error: "Failed to fetch property amenities" });
     }
   });
 
-  app.get("/api/properties/:id/bookings", async (req: Request, res: Response) => {
-    try {
-      const propertyId = parseInt(req.params.id);
-      const bookings = await storage.getBookingsByPropertyId(propertyId);
-      res.json(bookings);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch bookings" });
-    }
-  });
-
-  app.patch("/api/bookings/:id/status", async (req: Request, res: Response) => {
-    try {
-      const bookingId = parseInt(req.params.id);
-      const { status } = req.body;
-      
-      if (!status || typeof status !== 'string') {
-        return res.status(400).json({ message: "Status is required" });
-      }
-      
-      const updatedBooking = await storage.updateBookingStatus(bookingId, status);
-      
-      if (!updatedBooking) {
-        return res.status(404).json({ message: "Booking not found" });
-      }
-      
-      res.json(updatedBooking);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update booking status" });
-    }
-  });
-
-  // Reviews
   app.get("/api/properties/:id/reviews", async (req: Request, res: Response) => {
     try {
-      const propertyId = parseInt(req.params.id);
-      const reviews = await storage.getReviewsByPropertyId(propertyId);
+      const id = parseInt(req.params.id);
+      const reviews = await storage.getPropertyReviews(id);
       res.json(reviews);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch reviews" });
+      res.status(500).json({ error: "Failed to fetch property reviews" });
     }
   });
 
-  app.post("/api/reviews", async (req: Request, res: Response) => {
+  app.get("/api/amenities", async (_req: Request, res: Response) => {
     try {
-      const result = insertReviewSchema.safeParse(req.body);
-      
-      if (!result.success) {
-        return res.status(400).json({ message: "Invalid review data", errors: result.error.format() });
-      }
-      
-      const review = await storage.createReview(result.data);
-      res.json(review);
+      const amenities = await storage.getAmenities();
+      res.json(amenities);
     } catch (error) {
-      res.status(500).json({ message: "Failed to create review" });
+      res.status(500).json({ error: "Failed to fetch amenities" });
     }
   });
 
-  // Customization options
-  app.get("/api/properties/:id/customization-options", async (req: Request, res: Response) => {
+  app.get("/api/locations", async (_req: Request, res: Response) => {
     try {
-      const propertyId = parseInt(req.params.id);
-      const options = await storage.getCustomizationOptionsByPropertyId(propertyId);
-      res.json(options);
+      const locations = await storage.getLocations();
+      res.json(locations);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch customization options" });
+      res.status(500).json({ error: "Failed to fetch locations" });
     }
   });
 
-  // Messages
-  app.get("/api/messages", async (req: Request, res: Response) => {
+  app.post("/api/bookings", async (req: Request, res: Response) => {
     try {
-      const { senderId, receiverId, propertyId } = req.query;
+      const bookingData = insertBookingSchema.parse(req.body);
       
-      if (!senderId || !receiverId || !propertyId) {
-        return res.status(400).json({ message: "senderId, receiverId, and propertyId are required" });
-      }
-      
-      const messages = await storage.getMessagesBetweenUsers(
-        parseInt(senderId as string), 
-        parseInt(receiverId as string), 
-        parseInt(propertyId as string)
+      // Check availability
+      const isAvailable = await storage.checkAvailability(
+        bookingData.propertyId,
+        bookingData.checkIn,
+        bookingData.checkOut
       );
       
-      res.json(messages);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch messages" });
-    }
-  });
-
-  app.post("/api/messages", async (req: Request, res: Response) => {
-    try {
-      const result = insertMessageSchema.safeParse(req.body);
-      
-      if (!result.success) {
-        return res.status(400).json({ message: "Invalid message data", errors: result.error.format() });
+      if (!isAvailable) {
+        return res.status(400).json({ error: "Selected dates are not available" });
       }
       
-      const message = await storage.createMessage(result.data);
-      res.json(message);
+      const booking = await storage.createBooking(bookingData);
+      res.status(201).json(booking);
     } catch (error) {
-      res.status(500).json({ message: "Failed to send message" });
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: fromZodError(error).message });
+      }
+      res.status(500).json({ error: "Failed to create booking" });
     }
   });
 
-  app.patch("/api/messages/:id/read", async (req: Request, res: Response) => {
+  app.post("/api/contact", async (req: Request, res: Response) => {
     try {
-      const messageId = parseInt(req.params.id);
-      const updatedMessage = await storage.markMessageAsRead(messageId);
+      const contactData = insertContactSchema.parse(req.body);
+      const contact = await storage.createContact(contactData);
+      res.status(201).json(contact);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: fromZodError(error).message });
+      }
+      res.status(500).json({ error: "Failed to submit contact form" });
+    }
+  });
+
+  app.post("/api/properties/:id/reviews", async (req: Request, res: Response) => {
+    try {
+      const propertyId = parseInt(req.params.id);
       
-      if (!updatedMessage) {
-        return res.status(404).json({ message: "Message not found" });
+      // Ensure the property exists
+      const property = await storage.getProperty(propertyId);
+      if (!property) {
+        return res.status(404).json({ error: "Property not found" });
       }
       
-      res.json(updatedMessage);
+      const reviewData = insertReviewSchema.parse({
+        ...req.body,
+        propertyId
+      });
+      
+      const review = await storage.addReview(reviewData);
+      res.status(201).json(review);
     } catch (error) {
-      res.status(500).json({ message: "Failed to mark message as read" });
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: fromZodError(error).message });
+      }
+      res.status(500).json({ error: "Failed to submit review" });
     }
   });
 
-  // Destinations
-  app.get("/api/destinations", async (req: Request, res: Response) => {
+  app.post("/api/properties/:id/check-availability", async (req: Request, res: Response) => {
     try {
-      const destinations = await storage.getAllDestinations();
-      res.json(destinations);
+      const propertyId = parseInt(req.params.id);
+      
+      const schema = z.object({
+        checkIn: z.string().transform(date => new Date(date)),
+        checkOut: z.string().transform(date => new Date(date))
+      });
+      
+      const { checkIn, checkOut } = schema.parse(req.body);
+      
+      const isAvailable = await storage.checkAvailability(propertyId, checkIn, checkOut);
+      res.json({ available: isAvailable });
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch destinations" });
-    }
-  });
-
-  app.get("/api/destinations/featured", async (req: Request, res: Response) => {
-    try {
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : 4;
-      const destinations = await storage.getFeaturedDestinations(limit);
-      res.json(destinations);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch featured destinations" });
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: fromZodError(error).message });
+      }
+      res.status(500).json({ error: "Failed to check availability" });
     }
   });
 

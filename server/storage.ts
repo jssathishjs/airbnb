@@ -1,574 +1,550 @@
 import {
-  users, properties, bookings, reviews, customizationOptions, messages, destinations,
-  type User, type Property, type Booking, type Review, type CustomizationOption, type Message, type Destination,
-  type InsertUser, type InsertProperty, type InsertBooking, type InsertReview, type InsertCustomizationOption, type InsertMessage, type InsertDestination
+  properties, propertyImages, amenities, propertyAmenities, bookings, 
+  contacts, locations, reviews, type Property, type InsertProperty,
+  type PropertyImage, type InsertPropertyImage, type Amenity, 
+  type InsertAmenity, type PropertyAmenity, type InsertPropertyAmenity,
+  type Booking, type InsertBooking, type Contact, type InsertContact,
+  type Location, type InsertLocation, type Review, type InsertReview,
+  type PropertyWithDetails
 } from "@shared/schema";
 
 export interface IStorage {
-  // User operations
-  getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-
   // Property operations
-  getAllProperties(): Promise<Property[]>;
-  getProperty(id: number): Promise<Property | undefined>;
-  getPropertiesByHostId(hostId: number): Promise<Property[]>;
-  createProperty(property: InsertProperty): Promise<Property>;
-  searchProperties(query: {
+  getProperties(): Promise<Property[]>;
+  getProperty(id: number): Promise<PropertyWithDetails | undefined>;
+  getFeaturedProperties(limit?: number): Promise<Property[]>;
+  searchProperties(searchParams: {
     location?: string;
-    startDate?: Date;
-    endDate?: Date;
-    guests?: number;
+    checkIn?: Date;
+    checkOut?: Date;
     minPrice?: number;
     maxPrice?: number;
-    amenities?: string[];
-    type?: string;
+    bedrooms?: number;
+    bathrooms?: number;
+    amenities?: number[];
   }): Promise<Property[]>;
-  getFeaturedProperties(limit?: number): Promise<Property[]>;
-  getRecentProperties(limit?: number): Promise<Property[]>;
-
-  // Booking operations
-  getBooking(id: number): Promise<Booking | undefined>;
-  getBookingsByPropertyId(propertyId: number): Promise<Booking[]>;
-  getBookingsByUserId(userId: number): Promise<Booking[]>;
+  createProperty(property: InsertProperty): Promise<Property>;
+  
+  // Property images
+  getPropertyImages(propertyId: number): Promise<PropertyImage[]>;
+  addPropertyImage(image: InsertPropertyImage): Promise<PropertyImage>;
+  
+  // Amenities
+  getAmenities(): Promise<Amenity[]>;
+  getPropertyAmenities(propertyId: number): Promise<Amenity[]>;
+  addAmenity(amenity: InsertAmenity): Promise<Amenity>;
+  addPropertyAmenity(propertyAmenity: InsertPropertyAmenity): Promise<PropertyAmenity>;
+  
+  // Bookings
   createBooking(booking: InsertBooking): Promise<Booking>;
-  updateBookingStatus(id: number, status: string): Promise<Booking | undefined>;
-
-  // Review operations
-  getReviewsByPropertyId(propertyId: number): Promise<Review[]>;
-  createReview(review: InsertReview): Promise<Review>;
-
-  // Customization options operations
-  getCustomizationOptionsByPropertyId(propertyId: number): Promise<CustomizationOption[]>;
-  createCustomizationOption(option: InsertCustomizationOption): Promise<CustomizationOption>;
-
-  // Message operations
-  getMessagesBetweenUsers(userId1: number, userId2: number, propertyId: number): Promise<Message[]>;
-  createMessage(message: InsertMessage): Promise<Message>;
-  markMessageAsRead(id: number): Promise<Message | undefined>;
-
-  // Destination operations
-  getAllDestinations(): Promise<Destination[]>;
-  getDestination(id: number): Promise<Destination | undefined>;
-  createDestination(destination: InsertDestination): Promise<Destination>;
-  getFeaturedDestinations(limit?: number): Promise<Destination[]>;
+  getPropertyBookings(propertyId: number): Promise<Booking[]>;
+  checkAvailability(propertyId: number, checkIn: Date, checkOut: Date): Promise<boolean>;
+  
+  // Contacts
+  createContact(contact: InsertContact): Promise<Contact>;
+  
+  // Locations
+  getLocations(): Promise<Location[]>;
+  
+  // Reviews
+  getPropertyReviews(propertyId: number): Promise<Review[]>;
+  addReview(review: InsertReview): Promise<Review>;
 }
 
 export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private properties: Map<number, Property>;
-  private bookings: Map<number, Booking>;
-  private reviews: Map<number, Review>;
-  private customizationOptions: Map<number, CustomizationOption>;
-  private messages: Map<number, Message>;
-  private destinations: Map<number, Destination>;
+  private propertiesData: Map<number, Property>;
+  private propertyImagesData: Map<number, PropertyImage[]>;
+  private amenitiesData: Map<number, Amenity>;
+  private propertyAmenitiesData: Map<number, number[]>; // propertyId -> amenityIds
+  private bookingsData: Map<number, Booking>;
+  private contactsData: Map<number, Contact>;
+  private locationsData: Map<number, Location>;
+  private reviewsData: Map<number, Review[]>;
   
-  private currentUserId: number;
-  private currentPropertyId: number;
-  private currentBookingId: number;
-  private currentReviewId: number;
-  private currentCustomizationOptionId: number;
-  private currentMessageId: number;
-  private currentDestinationId: number;
-
+  private propertyIdCounter: number;
+  private propertyImageIdCounter: number;
+  private amenityIdCounter: number;
+  private propertyAmenityIdCounter: number;
+  private bookingIdCounter: number;
+  private contactIdCounter: number;
+  private locationIdCounter: number;
+  private reviewIdCounter: number;
+  
   constructor() {
-    this.users = new Map();
-    this.properties = new Map();
-    this.bookings = new Map();
-    this.reviews = new Map();
-    this.customizationOptions = new Map();
-    this.messages = new Map();
-    this.destinations = new Map();
+    this.propertiesData = new Map();
+    this.propertyImagesData = new Map();
+    this.amenitiesData = new Map();
+    this.propertyAmenitiesData = new Map();
+    this.bookingsData = new Map();
+    this.contactsData = new Map();
+    this.locationsData = new Map();
+    this.reviewsData = new Map();
     
-    this.currentUserId = 1;
-    this.currentPropertyId = 1;
-    this.currentBookingId = 1;
-    this.currentReviewId = 1;
-    this.currentCustomizationOptionId = 1;
-    this.currentMessageId = 1;
-    this.currentDestinationId = 1;
+    this.propertyIdCounter = 1;
+    this.propertyImageIdCounter = 1;
+    this.amenityIdCounter = 1;
+    this.propertyAmenityIdCounter = 1;
+    this.bookingIdCounter = 1;
+    this.contactIdCounter = 1;
+    this.locationIdCounter = 1;
+    this.reviewIdCounter = 1;
     
     // Initialize with sample data
-    this.initializeSampleData();
+    this.initializeData();
   }
-
-  // User operations
-  async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = { ...insertUser, id, createdAt: new Date() };
-    this.users.set(id, user);
-    return user;
-  }
-
-  // Property operations
-  async getAllProperties(): Promise<Property[]> {
-    return Array.from(this.properties.values());
-  }
-
-  async getProperty(id: number): Promise<Property | undefined> {
-    return this.properties.get(id);
-  }
-
-  async getPropertiesByHostId(hostId: number): Promise<Property[]> {
-    return Array.from(this.properties.values()).filter(
-      (property) => property.hostId === hostId,
-    );
-  }
-
-  async createProperty(insertProperty: InsertProperty): Promise<Property> {
-    const id = this.currentPropertyId++;
-    const property: Property = { ...insertProperty, id, createdAt: new Date() };
-    this.properties.set(id, property);
-    return property;
-  }
-
-  async searchProperties(query: {
-    location?: string;
-    startDate?: Date;
-    endDate?: Date;
-    guests?: number;
-    minPrice?: number;
-    maxPrice?: number;
-    amenities?: string[];
-    type?: string;
-  }): Promise<Property[]> {
-    let filteredProperties = Array.from(this.properties.values());
-
-    if (query.location) {
-      filteredProperties = filteredProperties.filter(property => 
-        property.location.toLowerCase().includes(query.location!.toLowerCase())
-      );
-    }
-
-    if (query.guests) {
-      filteredProperties = filteredProperties.filter(property => 
-        property.maxGuests >= query.guests!
-      );
-    }
-
-    if (query.minPrice) {
-      filteredProperties = filteredProperties.filter(property => 
-        Number(property.price) >= query.minPrice!
-      );
-    }
-
-    if (query.maxPrice) {
-      filteredProperties = filteredProperties.filter(property => 
-        Number(property.price) <= query.maxPrice!
-      );
-    }
-
-    if (query.amenities && query.amenities.length > 0) {
-      filteredProperties = filteredProperties.filter(property => 
-        query.amenities!.every(amenity => 
-          (property.amenities as string[]).includes(amenity)
-        )
-      );
-    }
-
-    if (query.type) {
-      filteredProperties = filteredProperties.filter(property => 
-        property.type === query.type
-      );
-    }
-
-    // Handle date filtering - check if property is available for the requested dates
-    if (query.startDate && query.endDate) {
-      const bookedProperties = this.getBookedPropertyIds(query.startDate, query.endDate);
-      filteredProperties = filteredProperties.filter(property => 
-        !bookedProperties.includes(property.id)
-      );
-    }
-
-    return filteredProperties;
-  }
-
-  private getBookedPropertyIds(startDate: Date, endDate: Date): number[] {
-    const bookings = Array.from(this.bookings.values()).filter(booking => {
-      const bookingStart = new Date(booking.startDate);
-      const bookingEnd = new Date(booking.endDate);
-      return (
-        (startDate >= bookingStart && startDate <= bookingEnd) ||
-        (endDate >= bookingStart && endDate <= bookingEnd) ||
-        (startDate <= bookingStart && endDate >= bookingEnd)
-      );
-    });
-    
-    return bookings.map(booking => booking.propertyId);
-  }
-
-  async getFeaturedProperties(limit: number = 6): Promise<Property[]> {
-    const allProperties = Array.from(this.properties.values());
-    
-    // Sort by rating (highest first) and take the specified limit
-    return allProperties
-      .sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0))
-      .slice(0, limit);
-  }
-
-  async getRecentProperties(limit: number = 3): Promise<Property[]> {
-    const allProperties = Array.from(this.properties.values());
-    
-    // Filter for newer properties and sort by creation date
-    return allProperties
-      .filter(property => property.isNew)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, limit);
-  }
-
-  // Booking operations
-  async getBooking(id: number): Promise<Booking | undefined> {
-    return this.bookings.get(id);
-  }
-
-  async getBookingsByPropertyId(propertyId: number): Promise<Booking[]> {
-    return Array.from(this.bookings.values()).filter(
-      (booking) => booking.propertyId === propertyId,
-    );
-  }
-
-  async getBookingsByUserId(userId: number): Promise<Booking[]> {
-    return Array.from(this.bookings.values()).filter(
-      (booking) => booking.userId === userId,
-    );
-  }
-
-  async createBooking(insertBooking: InsertBooking): Promise<Booking> {
-    const id = this.currentBookingId++;
-    const booking: Booking = { ...insertBooking, id, createdAt: new Date() };
-    this.bookings.set(id, booking);
-    return booking;
-  }
-
-  async updateBookingStatus(id: number, status: string): Promise<Booking | undefined> {
-    const booking = this.bookings.get(id);
-    
-    if (booking) {
-      const updatedBooking: Booking = { ...booking, status };
-      this.bookings.set(id, updatedBooking);
-      return updatedBooking;
-    }
-    
-    return undefined;
-  }
-
-  // Review operations
-  async getReviewsByPropertyId(propertyId: number): Promise<Review[]> {
-    return Array.from(this.reviews.values()).filter(
-      (review) => review.propertyId === propertyId,
-    );
-  }
-
-  async createReview(insertReview: InsertReview): Promise<Review> {
-    const id = this.currentReviewId++;
-    const review: Review = { ...insertReview, id, createdAt: new Date() };
-    this.reviews.set(id, review);
-    
-    // Update property review count
-    const property = this.properties.get(review.propertyId);
-    if (property) {
-      const updatedProperty: Property = { 
-        ...property, 
-        reviewCount: (property.reviewCount || 0) + 1,
-        rating: this.calculatePropertyRating(review.propertyId)
-      };
-      this.properties.set(property.id, updatedProperty);
-    }
-    
-    return review;
-  }
-
-  private calculatePropertyRating(propertyId: number): number {
-    const propertyReviews = Array.from(this.reviews.values()).filter(
-      (review) => review.propertyId === propertyId,
-    );
-    
-    if (propertyReviews.length === 0) return 0;
-    
-    const totalRating = propertyReviews.reduce(
-      (sum, review) => sum + review.rating, 
-      0
-    );
-    
-    return +(totalRating / propertyReviews.length).toFixed(2);
-  }
-
-  // Customization options operations
-  async getCustomizationOptionsByPropertyId(propertyId: number): Promise<CustomizationOption[]> {
-    return Array.from(this.customizationOptions.values()).filter(
-      (option) => option.propertyId === propertyId,
-    );
-  }
-
-  async createCustomizationOption(insertOption: InsertCustomizationOption): Promise<CustomizationOption> {
-    const id = this.currentCustomizationOptionId++;
-    const option: CustomizationOption = { ...insertOption, id };
-    this.customizationOptions.set(id, option);
-    return option;
-  }
-
-  // Message operations
-  async getMessagesBetweenUsers(userId1: number, userId2: number, propertyId: number): Promise<Message[]> {
-    return Array.from(this.messages.values())
-      .filter(message => 
-        ((message.senderId === userId1 && message.receiverId === userId2) || 
-         (message.senderId === userId2 && message.receiverId === userId1)) &&
-        message.propertyId === propertyId
-      )
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }
-
-  async createMessage(insertMessage: InsertMessage): Promise<Message> {
-    const id = this.currentMessageId++;
-    const message: Message = { 
-      ...insertMessage, 
-      id, 
-      createdAt: new Date(),
-      isRead: false 
-    };
-    this.messages.set(id, message);
-    return message;
-  }
-
-  async markMessageAsRead(id: number): Promise<Message | undefined> {
-    const message = this.messages.get(id);
-    
-    if (message) {
-      const updatedMessage: Message = { ...message, isRead: true };
-      this.messages.set(id, updatedMessage);
-      return updatedMessage;
-    }
-    
-    return undefined;
-  }
-
-  // Destination operations
-  async getAllDestinations(): Promise<Destination[]> {
-    return Array.from(this.destinations.values());
-  }
-
-  async getDestination(id: number): Promise<Destination | undefined> {
-    return this.destinations.get(id);
-  }
-
-  async createDestination(insertDestination: InsertDestination): Promise<Destination> {
-    const id = this.currentDestinationId++;
-    const destination: Destination = { ...insertDestination, id };
-    this.destinations.set(id, destination);
-    return destination;
-  }
-
-  async getFeaturedDestinations(limit: number = 4): Promise<Destination[]> {
-    const allDestinations = Array.from(this.destinations.values());
-    
-    // Sort by property count (most properties first) and take the specified limit
-    return allDestinations
-      .sort((a, b) => b.propertyCount - a.propertyCount)
-      .slice(0, limit);
-  }
-
-  // Initialize sample data for the application
-  private initializeSampleData() {
-    // Create sample users
-    const hostUser: InsertUser = {
-      username: "host_user",
-      password: "password123",
-      email: "host@example.com",
-      fullName: "Host User",
-      avatarUrl: "https://randomuser.me/api/portraits/men/1.jpg"
-    };
-    this.createUser(hostUser);
-
-    // Create sample destinations
-    const destinations: InsertDestination[] = [
-      {
-        name: "New York",
-        imageUrl: "https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-        propertyCount: 126
-      },
-      {
-        name: "Miami",
-        imageUrl: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-        propertyCount: 98
-      },
-      {
-        name: "Los Angeles",
-        imageUrl: "https://images.unsplash.com/photo-1444723121867-7a241cacace9?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-        propertyCount: 115
-      },
-      {
-        name: "Aspen",
-        imageUrl: "https://images.unsplash.com/photo-1525095182007-b1626e5a0bca?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-        propertyCount: 67
-      }
+  
+  private initializeData() {
+    // Sample amenities
+    const amenitiesList: InsertAmenity[] = [
+      { name: "WiFi", icon: "wifi" },
+      { name: "Pool", icon: "swimming" },
+      { name: "Hot Tub", icon: "hot-tub" },
+      { name: "Kitchen", icon: "utensils" },
+      { name: "Free Parking", icon: "parking" },
+      { name: "TV", icon: "tv" },
+      { name: "Air Conditioning", icon: "snowflake" },
+      { name: "Beach Access", icon: "umbrella-beach" },
+      { name: "Cleaning Service", icon: "broom" },
+      { name: "Workspace", icon: "desk" },
+      { name: "Fireplace", icon: "fire" },
+      { name: "City View", icon: "city" },
+      { name: "Mountain View", icon: "mountain" },
+      { name: "Gym", icon: "dumbbell" }
     ];
     
-    destinations.forEach(destination => this.createDestination(destination));
-
-    // Create sample properties
-    const properties: InsertProperty[] = [
+    amenitiesList.forEach(amenity => this.addAmenity(amenity));
+    
+    // Sample locations
+    const locationsList: InsertLocation[] = [
+      { name: "Malibu", type: "city" },
+      { name: "New York", type: "city" },
+      { name: "Aspen", type: "city" },
+      { name: "Lake Tahoe", type: "city" },
+      { name: "Miami", type: "city" },
+      { name: "Chicago", type: "city" },
+      { name: "California", type: "state" },
+      { name: "Colorado", type: "state" },
+      { name: "Nevada", type: "state" },
+      { name: "Florida", type: "state" },
+      { name: "Illinois", type: "state" },
+      { name: "New York", type: "state" }
+    ];
+    
+    locationsList.forEach(location => {
+      const id = this.locationIdCounter++;
+      this.locationsData.set(id, { ...location, id });
+    });
+    
+    // Sample properties with images and amenities
+    const propertiesList: InsertProperty[] = [
       {
-        title: "Modern Beachfront Villa",
-        description: "Enjoy this stunning beachfront villa with panoramic ocean views. This luxurious 4-bedroom property features modern architecture, high-end finishes, and direct beach access. The spacious living area opens to a private terrace with an infinity pool overlooking the Atlantic Ocean.",
-        location: "Miami Beach, Florida",
-        price: "349",
-        rating: "4.92",
-        reviewCount: 127,
+        title: "Luxury Beachfront Villa",
+        description: "Experience luxury living in this spectacular beachfront villa with panoramic ocean views. This spacious property offers modern amenities while maintaining a cozy atmosphere for your perfect getaway.",
+        location: "Malibu, California",
+        price: 350,
+        rating: 4.9,
         bedrooms: 4,
         bathrooms: 3,
-        maxGuests: 8,
-        imageUrls: [
-          "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-          "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
-        ],
-        amenities: ["Pool", "Ocean view", "Beachfront", "Wifi", "Air conditioning"],
-        hostId: 1,
-        isNew: false,
-        latitude: "25.7907",
-        longitude: "-80.1300",
-        type: "villa"
+        mainImage: "https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+        isFeatured: true
       },
       {
-        title: "Luxury Apartment Downtown",
-        description: "Experience luxury in the heart of New York City with this stunning apartment featuring floor-to-ceiling windows with breathtaking city views. This modern 2-bedroom unit has high-end finishes throughout and access to building amenities including a gym and rooftop terrace.",
-        location: "New York, NY",
-        price: "289",
-        rating: "4.87",
-        reviewCount: 94,
+        title: "Modern Downtown Apartment",
+        description: "Stay in this sleek and stylish apartment in the heart of downtown. Enjoy stunning city views and easy access to all the best restaurants, shopping, and entertainment.",
+        location: "New York, New York",
+        price: 180,
+        rating: 4.7,
         bedrooms: 2,
         bathrooms: 2,
-        maxGuests: 4,
-        imageUrls: [
-          "https://images.unsplash.com/photo-1493809842364-78817add7ffb?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
-        ],
-        amenities: ["Gym", "City view", "Wifi", "Air conditioning"],
-        hostId: 1,
-        isNew: false,
-        latitude: "40.7128",
-        longitude: "-74.0060",
-        type: "apartment"
+        mainImage: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+        isFeatured: true
       },
       {
         title: "Cozy Mountain Cabin",
-        description: "Get away from it all in this charming mountain cabin. Nestled among the trees with stunning mountain views, this 3-bedroom cabin features rustic decor with modern amenities. Relax in the hot tub or curl up by the fireplace after a day of skiing or hiking.",
+        description: "Escape to this charming cabin nestled in the mountains. Perfect for a peaceful retreat with beautiful views and outdoor activities right at your doorstep.",
         location: "Aspen, Colorado",
-        price: "259",
-        rating: "4.95",
-        reviewCount: 86,
+        price: 230,
+        rating: 4.8,
         bedrooms: 3,
         bathrooms: 2,
-        maxGuests: 6,
-        imageUrls: [
-          "https://images.unsplash.com/photo-1571055107559-3e67626fa8be?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
-        ],
-        amenities: ["Fireplace", "Hot tub", "Mountain view", "Wifi"],
-        hostId: 1,
-        isNew: false,
-        latitude: "39.1911",
-        longitude: "-106.8175",
-        type: "cabin"
+        mainImage: "https://images.unsplash.com/photo-1480074568708-e7b720bb3f09?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+        isFeatured: true
       },
       {
-        title: "Modern Suburban Home",
-        description: "Spacious and modern home in a quiet suburban neighborhood. Perfect for families, this 4-bedroom house has a large backyard with BBQ and outdoor dining area. Close to parks, shopping, and restaurants.",
-        location: "San Diego, California",
-        price: "199",
-        rating: "4.9",
-        reviewCount: 12,
+        title: "Lakefront Cottage",
+        description: "Experience tranquility at this beautiful lakefront cottage. Wake up to stunning lake views and enjoy direct access to water activities and hiking trails.",
+        location: "Lake Tahoe, Nevada",
+        price: 275,
+        rating: 4.9,
         bedrooms: 4,
-        bathrooms: 3,
-        maxGuests: 8,
-        imageUrls: [
-          "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
-        ],
-        amenities: ["Garden", "BBQ", "Wifi", "Free parking"],
-        hostId: 1,
-        isNew: true,
-        latitude: "32.7157",
-        longitude: "-117.1611",
-        type: "house"
+        bathrooms: 2,
+        mainImage: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+        isFeatured: true
       },
       {
-        title: "Beachside Bungalow",
-        description: "Charming beachside bungalow just steps from the sand. This cozy 2-bedroom cottage has been recently renovated with a light, airy interior and a private patio for outdoor dining. Walk to local restaurants and shops.",
-        location: "Santa Monica, California",
-        price: "239",
-        rating: "4.88",
-        reviewCount: 18,
-        bedrooms: 2,
-        bathrooms: 1,
-        maxGuests: 4,
-        imageUrls: [
-          "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
-        ],
-        amenities: ["Beach access", "Patio", "Wifi", "Air conditioning"],
-        hostId: 1,
-        isNew: true,
-        latitude: "34.0195",
-        longitude: "-118.4912",
-        type: "bungalow"
+        title: "Luxury Poolside Villa",
+        description: "Indulge in luxury at this elegant villa with a private pool. Perfect for those seeking privacy and comfort in a beautiful setting.",
+        location: "Miami, Florida",
+        price: 420,
+        rating: 5.0,
+        bedrooms: 5,
+        bathrooms: 4,
+        mainImage: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+        isFeatured: true
       },
       {
-        title: "Downtown Loft",
-        description: "Stylish loft in a converted historic building in the heart of Chicago. This modern 1-bedroom space features high ceilings, exposed brick, and large windows with views of the city skyline. Walk to shopping, dining, and cultural attractions.",
+        title: "Urban Studio Loft",
+        description: "Stay in this trendy loft in the heart of the city. Great for solo travelers or couples looking to experience urban living at its finest.",
         location: "Chicago, Illinois",
-        price: "179",
-        rating: "4.82",
-        reviewCount: 15,
+        price: 150,
+        rating: 4.6,
         bedrooms: 1,
         bathrooms: 1,
-        maxGuests: 2,
-        imageUrls: [
-          "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
-        ],
-        amenities: ["Skyline view", "Gym access", "Wifi", "Modern kitchen"],
-        hostId: 1,
-        isNew: true,
-        latitude: "41.8781",
-        longitude: "-87.6298",
-        type: "loft"
+        mainImage: "https://images.unsplash.com/photo-1493809842364-78817add7ffb?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+        isFeatured: true
+      },
+      {
+        title: "Secluded Forest Retreat",
+        description: "Find peace and quiet in this secluded cabin surrounded by forest. Perfect for nature lovers and those seeking to unplug.",
+        location: "Portland, Oregon",
+        price: 195,
+        rating: 4.7,
+        bedrooms: 2,
+        bathrooms: 1,
+        mainImage: "https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+        isFeatured: false
+      },
+      {
+        title: "Charming Historic Townhouse",
+        description: "Experience the charm of this beautifully renovated historic townhouse. Combining classic architecture with modern amenities.",
+        location: "Boston, Massachusetts",
+        price: 240,
+        rating: 4.8,
+        bedrooms: 3,
+        bathrooms: 2,
+        mainImage: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+        isFeatured: false
       }
     ];
     
-    properties.forEach(property => this.createProperty(property));
-
-    // Create sample customization options
-    const customizationOptions: InsertCustomizationOption[] = [
-      {
-        propertyId: 1,
-        name: "Welcome Package",
-        description: "Champagne, fruits, and local treats",
-        price: "49",
-        icon: "concierge-bell"
-      },
-      {
-        propertyId: 1,
-        name: "Airport Transfer",
-        description: "Private pickup and drop-off",
-        price: "79",
-        icon: "car"
-      },
-      {
-        propertyId: 1,
-        name: "Private Chef",
-        description: "Custom menu for one dinner",
-        price: "199",
-        icon: "utensils"
+    propertiesList.forEach(property => {
+      const newProperty = this.createProperty(property);
+      
+      // Add property images
+      const imageUrls = [
+        "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
+      ];
+      
+      imageUrls.forEach(url => {
+        this.addPropertyImage({
+          propertyId: newProperty.id,
+          imageUrl: url
+        });
+      });
+      
+      // Add property amenities
+      // Randomly select 4-6 amenities for each property
+      const amenityIds = Array.from({ length: this.amenityIdCounter - 1 }, (_, i) => i + 1);
+      const numAmenities = Math.floor(Math.random() * 3) + 4; // 4-6 amenities
+      const selectedAmenityIds = amenityIds
+        .sort(() => 0.5 - Math.random())
+        .slice(0, numAmenities);
+      
+      selectedAmenityIds.forEach(amenityId => {
+        this.addPropertyAmenity({
+          propertyId: newProperty.id,
+          amenityId
+        });
+      });
+      
+      // Add sample reviews
+      const reviewsCount = newProperty.reviewCount || Math.floor(Math.random() * 10) + 5;
+      const reviewers = [
+        { name: "Sarah Johnson", avatar: "https://randomuser.me/api/portraits/women/12.jpg" },
+        { name: "Michael Davis", avatar: "https://randomuser.me/api/portraits/men/32.jpg" },
+        { name: "Emily Richards", avatar: "https://randomuser.me/api/portraits/women/24.jpg" },
+        { name: "David Thompson", avatar: "https://randomuser.me/api/portraits/men/42.jpg" },
+        { name: "Jessica Kim", avatar: "https://randomuser.me/api/portraits/women/67.jpg" }
+      ];
+      
+      const comments = [
+        "Beautiful property with stunning views. The customizable options made it feel like a truly personalized experience.",
+        "This villa exceeded all our expectations! The location is absolutely perfect and the customization options made our stay even more special.",
+        "We loved staying here. The amenities were top-notch and the location was perfect for our needs.",
+        "Wonderful experience from start to finish. The property was exactly as described and the host was very responsive.",
+        "Great location and beautiful property. We'll definitely be coming back!"
+      ];
+      
+      for (let i = 0; i < reviewsCount; i++) {
+        const reviewer = reviewers[Math.floor(Math.random() * reviewers.length)];
+        const comment = comments[Math.floor(Math.random() * comments.length)];
+        const rating = Math.floor(Math.random() * 2) + 4; // 4-5 rating
+        
+        this.addReview({
+          propertyId: newProperty.id,
+          guestName: reviewer.name,
+          rating,
+          comment,
+          avatar: reviewer.avatar
+        });
       }
-    ];
+    });
+  }
+  
+  // Property operations
+  async getProperties(): Promise<Property[]> {
+    return Array.from(this.propertiesData.values());
+  }
+  
+  async getProperty(id: number): Promise<PropertyWithDetails | undefined> {
+    const property = this.propertiesData.get(id);
+    if (!property) return undefined;
     
-    customizationOptions.forEach(option => this.createCustomizationOption(option));
+    const images = await this.getPropertyImages(id);
+    const amenities = await this.getPropertyAmenities(id);
+    const reviews = await this.getPropertyReviews(id);
+    
+    return {
+      ...property,
+      images,
+      amenities,
+      reviews
+    };
+  }
+  
+  async getFeaturedProperties(limit = 6): Promise<Property[]> {
+    return Array.from(this.propertiesData.values())
+      .filter(property => property.isFeatured)
+      .slice(0, limit);
+  }
+  
+  async searchProperties(searchParams: {
+    location?: string;
+    checkIn?: Date;
+    checkOut?: Date;
+    minPrice?: number;
+    maxPrice?: number;
+    bedrooms?: number;
+    bathrooms?: number;
+    amenities?: number[];
+  }): Promise<Property[]> {
+    let filteredProperties = Array.from(this.propertiesData.values());
+    
+    if (searchParams.location) {
+      filteredProperties = filteredProperties.filter(property => 
+        property.location.toLowerCase().includes(searchParams.location!.toLowerCase())
+      );
+    }
+    
+    if (searchParams.minPrice !== undefined) {
+      filteredProperties = filteredProperties.filter(property => 
+        Number(property.price) >= searchParams.minPrice!
+      );
+    }
+    
+    if (searchParams.maxPrice !== undefined) {
+      filteredProperties = filteredProperties.filter(property => 
+        Number(property.price) <= searchParams.maxPrice!
+      );
+    }
+    
+    if (searchParams.bedrooms !== undefined) {
+      filteredProperties = filteredProperties.filter(property => 
+        property.bedrooms >= searchParams.bedrooms!
+      );
+    }
+    
+    if (searchParams.bathrooms !== undefined) {
+      filteredProperties = filteredProperties.filter(property => 
+        property.bathrooms >= searchParams.bathrooms!
+      );
+    }
+    
+    if (searchParams.amenities && searchParams.amenities.length > 0) {
+      filteredProperties = await Promise.all(
+        filteredProperties.map(async property => {
+          const propertyAmenities = await this.getPropertyAmenities(property.id);
+          const propertyAmenityIds = propertyAmenities.map(a => a.id);
+          
+          const hasAllRequiredAmenities = searchParams.amenities!.every(
+            amenityId => propertyAmenityIds.includes(amenityId)
+          );
+          
+          return { property, hasAllRequiredAmenities };
+        })
+      ).then(results => 
+        results
+          .filter(result => result.hasAllRequiredAmenities)
+          .map(result => result.property)
+      );
+    }
+    
+    if (searchParams.checkIn && searchParams.checkOut) {
+      filteredProperties = await Promise.all(
+        filteredProperties.map(async property => {
+          const isAvailable = await this.checkAvailability(
+            property.id,
+            searchParams.checkIn!,
+            searchParams.checkOut!
+          );
+          
+          return { property, isAvailable };
+        })
+      ).then(results => 
+        results
+          .filter(result => result.isAvailable)
+          .map(result => result.property)
+      );
+    }
+    
+    return filteredProperties;
+  }
+  
+  async createProperty(property: InsertProperty): Promise<Property> {
+    const id = this.propertyIdCounter++;
+    const newProperty: Property = { ...property, id };
+    this.propertiesData.set(id, newProperty);
+    return newProperty;
+  }
+  
+  // Property images
+  async getPropertyImages(propertyId: number): Promise<PropertyImage[]> {
+    return this.propertyImagesData.get(propertyId) || [];
+  }
+  
+  async addPropertyImage(image: InsertPropertyImage): Promise<PropertyImage> {
+    const id = this.propertyImageIdCounter++;
+    const newImage: PropertyImage = { ...image, id };
+    
+    if (!this.propertyImagesData.has(image.propertyId)) {
+      this.propertyImagesData.set(image.propertyId, []);
+    }
+    
+    this.propertyImagesData.get(image.propertyId)!.push(newImage);
+    return newImage;
+  }
+  
+  // Amenities
+  async getAmenities(): Promise<Amenity[]> {
+    return Array.from(this.amenitiesData.values());
+  }
+  
+  async getPropertyAmenities(propertyId: number): Promise<Amenity[]> {
+    const amenityIds = this.propertyAmenitiesData.get(propertyId) || [];
+    return amenityIds.map(id => this.amenitiesData.get(id)!);
+  }
+  
+  async addAmenity(amenity: InsertAmenity): Promise<Amenity> {
+    const id = this.amenityIdCounter++;
+    const newAmenity: Amenity = { ...amenity, id };
+    this.amenitiesData.set(id, newAmenity);
+    return newAmenity;
+  }
+  
+  async addPropertyAmenity(propertyAmenity: InsertPropertyAmenity): Promise<PropertyAmenity> {
+    const id = this.propertyAmenityIdCounter++;
+    const newPropertyAmenity: PropertyAmenity = { ...propertyAmenity, id };
+    
+    if (!this.propertyAmenitiesData.has(propertyAmenity.propertyId)) {
+      this.propertyAmenitiesData.set(propertyAmenity.propertyId, []);
+    }
+    
+    this.propertyAmenitiesData.get(propertyAmenity.propertyId)!.push(propertyAmenity.amenityId);
+    return newPropertyAmenity;
+  }
+  
+  // Bookings
+  async createBooking(booking: InsertBooking): Promise<Booking> {
+    const id = this.bookingIdCounter++;
+    const newBooking: Booking = { 
+      ...booking, 
+      id,
+      createdAt: new Date()
+    };
+    
+    this.bookingsData.set(id, newBooking);
+    return newBooking;
+  }
+  
+  async getPropertyBookings(propertyId: number): Promise<Booking[]> {
+    return Array.from(this.bookingsData.values())
+      .filter(booking => booking.propertyId === propertyId);
+  }
+  
+  async checkAvailability(propertyId: number, checkIn: Date, checkOut: Date): Promise<boolean> {
+    const bookings = await this.getPropertyBookings(propertyId);
+    
+    const checkInTime = new Date(checkIn).getTime();
+    const checkOutTime = new Date(checkOut).getTime();
+    
+    // Check if there's any overlap with existing bookings
+    const isOverlapping = bookings.some(booking => {
+      const bookingCheckInTime = new Date(booking.checkIn).getTime();
+      const bookingCheckOutTime = new Date(booking.checkOut).getTime();
+      
+      return (
+        (checkInTime >= bookingCheckInTime && checkInTime < bookingCheckOutTime) ||
+        (checkOutTime > bookingCheckInTime && checkOutTime <= bookingCheckOutTime) ||
+        (checkInTime <= bookingCheckInTime && checkOutTime >= bookingCheckOutTime)
+      );
+    });
+    
+    return !isOverlapping;
+  }
+  
+  // Contacts
+  async createContact(contact: InsertContact): Promise<Contact> {
+    const id = this.contactIdCounter++;
+    const newContact: Contact = { 
+      ...contact, 
+      id,
+      createdAt: new Date()
+    };
+    
+    this.contactsData.set(id, newContact);
+    return newContact;
+  }
+  
+  // Locations
+  async getLocations(): Promise<Location[]> {
+    return Array.from(this.locationsData.values());
+  }
+  
+  // Reviews
+  async getPropertyReviews(propertyId: number): Promise<Review[]> {
+    return this.reviewsData.get(propertyId) || [];
+  }
+  
+  async addReview(review: InsertReview): Promise<Review> {
+    const id = this.reviewIdCounter++;
+    const newReview: Review = { 
+      ...review, 
+      id,
+      date: new Date()
+    };
+    
+    if (!this.reviewsData.has(review.propertyId)) {
+      this.reviewsData.set(review.propertyId, []);
+    }
+    
+    this.reviewsData.get(review.propertyId)!.push(newReview);
+    
+    // Update property review count and rating
+    const property = this.propertiesData.get(review.propertyId);
+    if (property) {
+      const reviews = this.reviewsData.get(review.propertyId)!;
+      property.reviewCount = reviews.length;
+      
+      // Calculate average rating
+      const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+      property.rating = totalRating / reviews.length;
+      
+      this.propertiesData.set(review.propertyId, property);
+    }
+    
+    return newReview;
   }
 }
 

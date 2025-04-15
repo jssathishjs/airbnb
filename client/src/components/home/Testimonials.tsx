@@ -1,67 +1,89 @@
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Card, CardContent } from "@/components/ui/card";
 import { Star } from "lucide-react";
 
-const testimonials = [
+interface TestimonialProps {
+  rating: number;
+  content: string;
+  author: {
+    name: string;
+    image: string;
+    property: string;
+  };
+}
+
+const testimonials: TestimonialProps[] = [
   {
-    id: 1,
-    name: "Sarah J.",
-    avatar: "https://randomuser.me/api/portraits/women/1.jpg",
-    stars: 5,
-    text: "Our stay was absolutely perfect! The property was exactly as described, and the customization options for our stay were a wonderful touch. Will definitely book again!"
+    rating: 5,
+    content: "We loved the ability to customize our stay. The welcome package with local specialties was the perfect way to start our vacation, and the host's recommendations were spot on!",
+    author: {
+      name: "Emily R.",
+      image: "https://randomuser.me/api/portraits/women/24.jpg",
+      property: "Lake Tahoe Property"
+    }
   },
   {
-    id: 2,
-    name: "David M.",
-    avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-    stars: 4.5,
-    text: "The property was clean, beautifully decorated, and in a perfect location. The host was responsive and accommodating to all our requests. Highly recommend!"
+    rating: 5,
+    content: "The property was exactly as described and the customization options made our anniversary special. We opted for the romantic beach dinner setup and it was absolutely magical.",
+    author: {
+      name: "David T.",
+      image: "https://randomuser.me/api/portraits/men/42.jpg",
+      property: "Malibu Villa"
+    }
   },
   {
-    id: 3,
-    name: "Emily R.",
-    avatar: "https://randomuser.me/api/portraits/women/2.jpg",
-    stars: 5,
-    text: "We loved being able to customize our stay with additional amenities. It made our family vacation so much more enjoyable. The property was stunning and exactly as pictured."
+    rating: 5,
+    content: "StayVista made finding and booking our vacation rental so easy. The communication with the host was seamless, and the property exceeded our expectations in every way.",
+    author: {
+      name: "Jessica K.",
+      image: "https://randomuser.me/api/portraits/women/67.jpg",
+      property: "New York Apartment"
+    }
   }
 ];
 
-const Testimonials = () => {
+function Testimonial({ rating, content, author }: TestimonialProps) {
   return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-16">
-      <h2 className="text-2xl font-bold text-gray-800 mb-8 text-center">What Our Guests Say</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {testimonials.map((testimonial) => (
-          <div key={testimonial.id} className="bg-white p-6 rounded-xl shadow-md">
-            <div className="flex items-center mb-4">
-              <div className="h-12 w-12 rounded-full overflow-hidden mr-4">
-                <img 
-                  src={testimonial.avatar} 
-                  alt={testimonial.name} 
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <div>
-                <h4 className="font-semibold text-gray-800">{testimonial.name}</h4>
-                <div className="flex text-yellow-400">
-                  {Array(5).fill(0).map((_, i) => (
-                    <Star 
-                      key={i} 
-                      className="h-4 w-4 fill-current" 
-                      fill={i < Math.floor(testimonial.stars) ? "currentColor" : "none"}
-                      fillOpacity={i >= Math.floor(testimonial.stars) && i < testimonial.stars ? "0.5" : "1"}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-            <p className="text-gray-800">
-              "{testimonial.text}"
-            </p>
+    <Card className="h-full">
+      <CardContent className="p-6">
+        <div className="flex mb-4">
+          {Array.from({ length: 5 }, (_, i) => (
+            <Star
+              key={i}
+              className={`h-5 w-5 ${
+                i < rating ? "fill-amber-400 text-amber-400" : "text-gray-300"
+              }`}
+            />
+          ))}
+        </div>
+        <p className="text-muted-foreground mb-4">{content}</p>
+        <div className="flex items-center">
+          <Avatar className="h-10 w-10 mr-3">
+            <AvatarImage src={author.image} alt={author.name} />
+            <AvatarFallback>{author.name[0]}</AvatarFallback>
+          </Avatar>
+          <div>
+            <h4 className="font-medium">{author.name}</h4>
+            <p className="text-muted-foreground text-sm">{author.property}</p>
           </div>
-        ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function Testimonials() {
+  return (
+    <section className="py-16">
+      <div className="container mx-auto px-4">
+        <h2 className="text-3xl font-semibold text-center mb-12">What Our Guests Are Saying</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {testimonials.map((testimonial, index) => (
+            <Testimonial key={index} {...testimonial} />
+          ))}
+        </div>
       </div>
     </section>
   );
-};
-
-export default Testimonials;
+}
