@@ -37,8 +37,8 @@ export default function SearchFilters() {
   const [guests, setGuests] = useState('1');
   const [minPrice, setMinPrice] = useState(50);
   const [maxPrice, setMaxPrice] = useState(500);
-  const [bedrooms, setBedrooms] = useState('');
-  const [bathrooms, setBathrooms] = useState('');
+  const [bedrooms, setBedrooms] = useState('any');
+  const [bathrooms, setBathrooms] = useState('any');
   
   const handleSearch = () => {
     // Build the search query
@@ -50,8 +50,8 @@ export default function SearchFilters() {
     if (guests && Number(guests) > 0) queryParams.append('guests', guests);
     if (minPrice !== 50) queryParams.append('minPrice', minPrice.toString());
     if (maxPrice !== 500) queryParams.append('maxPrice', maxPrice.toString());
-    if (bedrooms) queryParams.append('bedrooms', bedrooms);
-    if (bathrooms) queryParams.append('bathrooms', bathrooms);
+    if (bedrooms && bedrooms !== 'any') queryParams.append('bedrooms', bedrooms);
+    if (bathrooms && bathrooms !== 'any') queryParams.append('bathrooms', bathrooms);
     
     // Navigate to the properties page with the search query
     setLocation(`/properties?${queryParams.toString()}`);
@@ -179,7 +179,7 @@ export default function SearchFilters() {
                 <SelectValue placeholder="Any" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Any</SelectItem>
+                <SelectItem value="any">Any</SelectItem>
                 {[1, 2, 3, 4, 5, 6].map((num) => (
                   <SelectItem key={num} value={num.toString()}>
                     {num}+
@@ -196,7 +196,7 @@ export default function SearchFilters() {
                 <SelectValue placeholder="Any" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Any</SelectItem>
+                <SelectItem value="any">Any</SelectItem>
                 {[1, 2, 3, 4, 5].map((num) => (
                   <SelectItem key={num} value={num.toString()}>
                     {num}+
