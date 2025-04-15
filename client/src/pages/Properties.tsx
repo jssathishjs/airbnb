@@ -3,12 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearch } from "wouter";
 import { Helmet } from 'react-helmet';
 import { Property } from "@shared/schema";
-import SearchForm from "@/components/search/SearchForm";
+import SearchFilters from "@/components/search/SearchFilters";
 import PropertyCard from "@/components/property/PropertyCard";
 import FilterOptions from "@/components/search/FilterOptions";
 import PropertyMap from "@/components/property/PropertyMap";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ListFilter, Grid, Map } from "lucide-react";
+import { Grid, Map } from "lucide-react";
 
 export default function Properties() {
   const search = useSearch();
@@ -40,8 +40,23 @@ export default function Properties() {
   const handleFilterChange = (newFilters: { amenities: number[]; propertyType: string }) => {
     setFilters(newFilters);
     
-    // In a real app, this would update the URL and trigger a refetch
-    // For now we'll just simulate filtering on the client side
+    // Update URL without navigating (this would trigger a refetch through the queryKey)
+    const newSearchParams = new URLSearchParams(search);
+    
+    if (newFilters.amenities.length > 0) {
+      newSearchParams.set('amenities', newFilters.amenities.join(','));
+    } else {
+      newSearchParams.delete('amenities');
+    }
+    
+    if (newFilters.propertyType !== 'all') {
+      newSearchParams.set('propertyType', newFilters.propertyType);
+    } else {
+      newSearchParams.delete('propertyType');
+    }
+    
+    // In a real app with proper routing, we would update the URL here
+    // window.history.replaceState(null, '', `?${newSearchParams.toString()}`);
   };
   
   // Apply client-side filtering for property type (in a real app, this would be done server-side)
@@ -76,17 +91,20 @@ export default function Properties() {
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-semibold mb-6">Find Your Perfect Stay</h1>
         
-        <div className="mb-8">
-          <SearchForm />
-        </div>
-        
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-1">
-            <FilterOptions 
-              onFilterChange={handleFilterChange}
-              initialAmenities={filters.amenities}
-              initialPropertyType={filters.propertyType}
-            />
+            {/* Enhanced search filters */}
+            <div className="sticky top-4">
+              <SearchFilters />
+              
+              <div className="mt-6">
+                <FilterOptions 
+                  onFilterChange={handleFilterChange}
+                  initialAmenities={filters.amenities}
+                  initialPropertyType={filters.propertyType}
+                />
+              </div>
+            </div>
           </div>
           
           <div className="lg:col-span-3">
@@ -112,7 +130,7 @@ export default function Properties() {
             </div>
             
             {isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
                   <div key={i} className="h-[400px] bg-gray-200 animate-pulse rounded-lg"></div>
                 ))}

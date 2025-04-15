@@ -18,12 +18,11 @@ import {
   Mountain,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { type PropertyWithDetails } from "@shared/schema";
 import PropertyGallery from "@/components/property/PropertyGallery";
-import BookingForm from "@/components/property/BookingForm";
+import BookingCalendar from "@/components/property/BookingCalendar";
 import AmenityIcon from "@/components/property/AmenityIcon";
 import ContactHost from "@/components/property/ContactHost";
 
@@ -269,7 +268,11 @@ export default function PropertyDetail({ propertyId }: PropertyDetailProps) {
               />
             ) : (
               <>
-                <BookingForm property={property} />
+                <BookingCalendar 
+                  propertyId={property.id} 
+                  price={property.price} 
+                  title={property.title} 
+                />
                 <div className="mt-4">
                   <Button 
                     variant="outline" 
