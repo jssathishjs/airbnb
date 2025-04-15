@@ -7,6 +7,8 @@ import {
   type Location, type InsertLocation, type Review, type InsertReview,
   type PropertyWithDetails
 } from "@shared/schema";
+import { db } from "./db";
+import { and, eq, gte, lte, like, inArray, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Property operations
@@ -548,4 +550,215 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  // Property operations
+  async getProperties(): Promise<Property[]> {
+    return db.select().from(properties);
+  }
+  
+  async getProperty(id: number): Promise<PropertyWithDetails | undefined> {
+    const [property] = await db.select().from(properties).where(eq(properties.id, id));
+    
+    if (!property) return undefined;
+    
+    const images = await this.getPropertyImages(id);
+    const amenities = await this.getPropertyAmenities(id);
+    const reviews = await this.getPropertyReviews(id);
+    
+    return {
+      ...property,
+      images,
+      amenities,
+      reviews
+    };
+  }
+  
+  async getFeaturedProperties(limit = 6): Promise<Property[]> {
+    return db.select()
+      .from(properties)
+      .where(eq(properties.isFeatured, true))
+      .limit(limit);
+  }
+  
+  async searchProperties(searchParams: {
+    location?: string;
+    checkIn?: Date;
+    checkOut?: Date;
+    minPrice?: number;
+    maxPrice?: number;
+    bedrooms?: number;
+    bathrooms?: number;
+    amenities?: number[];
+  }): Promise<Property[]> {
+    let query = db.select().from(properties);
+    const conditions = [];
+    
+    if (searchParams.location) {
+      conditions.push(like(properties.location, `%${searchParams.location}%`));
+    }
+    
+    if (searchParams.minPrice !== undefined) {
+      conditions.push(gte(properties.price, searchParams.minPrice.toString()));
+    }
+    
+    if (searchParams.maxPrice !== undefined) {
+      conditions.push(lte(properties.price, searchParams.maxPrice.toString()));
+    }
+    
+    if (searchParams.bedrooms !== undefined) {
+      conditions.push(gte(properties.bedrooms, searchParams.bedrooms));
+    }
+    
+    if (searchParams.bathrooms !== undefined) {
+      conditions.push(gte(properties.bathrooms, searchParams.bathrooms));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+    
+    let filteredProperties = await query;
+    
+    // Handle amenities filter with a separate query
+    if (searchParams.amenities && searchParams.amenities.length > 0) {
+      const propertyAmenitiesResults = await db.select({
+        propertyId: propertyAmenities.propertyId,
+        amenityCount: sql<number>`count(${propertyAmenities.amenityId})`
+      })
+      .from(propertyAmenities)
+      .where(inArray(propertyAmenities.amenityId, searchParams.amenities))
+      .groupBy(propertyAmenities.propertyId)
+      .having(sql`count(${propertyAmenities.amenityId}) = ${searchParams.amenities.length}`);
+      
+      const propertyIds = propertyAmenitiesResults.map(pa => pa.propertyId);
+      filteredProperties = filteredProperties.filter(p => propertyIds.includes(p.id));
+    }
+    
+    // Handle availability with a separate query
+    if (searchParams.checkIn && searchParams.checkOut) {
+      const unavailablePropertyIds = await db.select({ propertyId: bookings.propertyId })
+        .from(bookings)
+        .where(
+          and(
+            // Check if requested dates overlap with any existing booking
+            // (checkIn <= existing.checkOut && checkOut >= existing.checkIn)
+            lte(bookings.checkIn, searchParams.checkOut),
+            gte(bookings.checkOut, searchParams.checkIn)
+          )
+        )
+        .then(results => results.map(r => r.propertyId));
+      
+      filteredProperties = filteredProperties.filter(p => !unavailablePropertyIds.includes(p.id));
+    }
+    
+    return filteredProperties;
+  }
+  
+  async createProperty(property: InsertProperty): Promise<Property> {
+    const [newProperty] = await db.insert(properties).values(property).returning();
+    return newProperty;
+  }
+  
+  // Property images
+  async getPropertyImages(propertyId: number): Promise<PropertyImage[]> {
+    return db.select()
+      .from(propertyImages)
+      .where(eq(propertyImages.propertyId, propertyId));
+  }
+  
+  async addPropertyImage(image: InsertPropertyImage): Promise<PropertyImage> {
+    const [newImage] = await db.insert(propertyImages).values(image).returning();
+    return newImage;
+  }
+  
+  // Amenities
+  async getAmenities(): Promise<Amenity[]> {
+    return db.select().from(amenities);
+  }
+  
+  async getPropertyAmenities(propertyId: number): Promise<Amenity[]> {
+    const result = await db.select({
+      amenity: amenities
+    })
+    .from(propertyAmenities)
+    .innerJoin(amenities, eq(propertyAmenities.amenityId, amenities.id))
+    .where(eq(propertyAmenities.propertyId, propertyId));
+    
+    return result.map(r => r.amenity);
+  }
+  
+  async addAmenity(amenity: InsertAmenity): Promise<Amenity> {
+    const [newAmenity] = await db.insert(amenities).values(amenity).returning();
+    return newAmenity;
+  }
+  
+  async addPropertyAmenity(propertyAmenity: InsertPropertyAmenity): Promise<PropertyAmenity> {
+    const [newPropertyAmenity] = await db.insert(propertyAmenities).values(propertyAmenity).returning();
+    return newPropertyAmenity;
+  }
+  
+  // Bookings
+  async createBooking(booking: InsertBooking): Promise<Booking> {
+    const [newBooking] = await db.insert(bookings).values(booking).returning();
+    return newBooking;
+  }
+  
+  async getPropertyBookings(propertyId: number): Promise<Booking[]> {
+    return db.select()
+      .from(bookings)
+      .where(eq(bookings.propertyId, propertyId));
+  }
+  
+  async checkAvailability(propertyId: number, checkIn: Date, checkOut: Date): Promise<boolean> {
+    const overlappingBookings = await db.select({ count: sql<number>`count(*)` })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.propertyId, propertyId),
+          lte(bookings.checkIn, checkOut),
+          gte(bookings.checkOut, checkIn)
+        )
+      );
+    
+    return overlappingBookings[0].count === 0;
+  }
+  
+  // Contacts
+  async createContact(contact: InsertContact): Promise<Contact> {
+    const [newContact] = await db.insert(contacts).values(contact).returning();
+    return newContact;
+  }
+  
+  // Locations
+  async getLocations(): Promise<Location[]> {
+    return db.select().from(locations);
+  }
+  
+  // Reviews
+  async getPropertyReviews(propertyId: number): Promise<Review[]> {
+    return db.select()
+      .from(reviews)
+      .where(eq(reviews.propertyId, propertyId))
+      .orderBy(desc(reviews.date));
+  }
+  
+  async addReview(review: InsertReview): Promise<Review> {
+    const [newReview] = await db.insert(reviews).values(review).returning();
+    
+    // Update the property's review count and average rating
+    const allReviews = await this.getPropertyReviews(review.propertyId);
+    const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
+    
+    await db.update(properties)
+      .set({
+        reviewCount: allReviews.length,
+        rating: avgRating.toFixed(1)
+      })
+      .where(eq(properties.id, review.propertyId));
+    
+    return newReview;
+  }
+}
+
+// Use the DatabaseStorage implementation instead of MemStorage
+export const storage = new DatabaseStorage();

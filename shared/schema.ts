@@ -1,6 +1,7 @@
-import { pgTable, text, serial, integer, boolean, date, timestamp, varchar, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, date, timestamp, varchar, numeric, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
 
 // Property schema
 export const properties = pgTable("properties", {
@@ -140,6 +141,58 @@ export type InsertLocation = z.infer<typeof insertLocationSchema>;
 
 export type Review = typeof reviews.$inferSelect;
 export type InsertReview = z.infer<typeof insertReviewSchema>;
+
+// Define relations between tables
+export const propertiesRelations = relations(properties, ({ many }) => ({
+  images: many(propertyImages),
+  amenities: many(propertyAmenities),
+  bookings: many(bookings),
+  reviews: many(reviews),
+  contacts: many(contacts),
+}));
+
+export const propertyImagesRelations = relations(propertyImages, ({ one }) => ({
+  property: one(properties, {
+    fields: [propertyImages.propertyId],
+    references: [properties.id],
+  }),
+}));
+
+export const amenitiesRelations = relations(amenities, ({ many }) => ({
+  properties: many(propertyAmenities),
+}));
+
+export const propertyAmenitiesRelations = relations(propertyAmenities, ({ one }) => ({
+  property: one(properties, {
+    fields: [propertyAmenities.propertyId],
+    references: [properties.id],
+  }),
+  amenity: one(amenities, {
+    fields: [propertyAmenities.amenityId],
+    references: [amenities.id],
+  }),
+}));
+
+export const bookingsRelations = relations(bookings, ({ one }) => ({
+  property: one(properties, {
+    fields: [bookings.propertyId],
+    references: [properties.id],
+  }),
+}));
+
+export const contactsRelations = relations(contacts, ({ one }) => ({
+  property: one(properties, {
+    fields: [contacts.propertyId],
+    references: [properties.id],
+  }),
+}));
+
+export const reviewsRelations = relations(reviews, ({ one }) => ({
+  property: one(properties, {
+    fields: [reviews.propertyId],
+    references: [properties.id],
+  }),
+}));
 
 // Extended types for API responses
 export type PropertyWithDetails = Property & {
