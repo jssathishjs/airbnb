@@ -51,15 +51,26 @@ async function seedAmenities() {
     { name: "Gym", icon: "dumbbell" }
   ];
 
-  const { data, error } = await supabase
-    .from('amenities')
-    .upsert(amenities, { onConflict: 'name' })
-    .select();
+  console.log('Attempting to add amenities to Supabase...');
+  try {
+    const { data, error } = await supabase
+      .from('amenities')
+      .upsert(amenities, { onConflict: 'name' })
+      .select();
 
-  if (error) {
-    console.error('Error seeding amenities:', error);
-  } else {
-    console.log(`Added ${data.length} amenities`);
+    if (error) {
+      console.error('Error seeding amenities:', error);
+      // Let's try a simple insert to see if that works
+      const insertResult = await supabase
+        .from('amenities')
+        .insert([{ name: "Test Amenity", icon: "test" }]);
+      
+      console.log('Simple insert test result:', insertResult);
+    } else {
+      console.log(`Added ${data?.length || 0} amenities`);
+    }
+  } catch (e) {
+    console.error('Exception adding amenities:', e);
   }
 }
 
@@ -79,15 +90,26 @@ async function seedLocations() {
     { name: "New York", type: "state" }
   ];
 
-  const { data, error } = await supabase
-    .from('locations')
-    .upsert(locations, { onConflict: 'name,type' })
-    .select();
+  console.log('Attempting to add locations to Supabase...');
+  try {
+    const { data, error } = await supabase
+      .from('locations')
+      .upsert(locations, { onConflict: 'name,type' })
+      .select();
 
-  if (error) {
-    console.error('Error seeding locations:', error);
-  } else {
-    console.log(`Added ${data.length} locations`);
+    if (error) {
+      console.error('Error seeding locations:', error);
+      // Let's try a simple insert to see if that works
+      const insertResult = await supabase
+        .from('locations')
+        .insert([{ name: "Test Location", type: "test" }]);
+      
+      console.log('Simple insert test result:', insertResult);
+    } else {
+      console.log(`Added ${data?.length || 0} locations`);
+    }
+  } catch (e) {
+    console.error('Exception adding locations:', e);
   }
 }
 
@@ -116,76 +138,53 @@ async function seedProperties() {
       main_image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
       is_featured: true,
       review_count: 0
-    },
-    {
-      title: "Cozy Mountain Cabin",
-      description: "Escape to this charming cabin nestled in the mountains. Perfect for a peaceful retreat with beautiful views and outdoor activities right at your doorstep.",
-      location: "Aspen, Colorado",
-      price: "230",
-      rating: "4.8",
-      bedrooms: 3,
-      bathrooms: 2,
-      main_image: "https://images.unsplash.com/photo-1480074568708-e7b720bb3f09?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      is_featured: true,
-      review_count: 0
-    },
-    {
-      title: "Lakefront Cottage",
-      description: "Experience tranquility at this beautiful lakefront cottage. Wake up to stunning lake views and enjoy direct access to water activities and hiking trails.",
-      location: "Lake Tahoe, Nevada",
-      price: "275",
-      rating: "4.9",
-      bedrooms: 4,
-      bathrooms: 2,
-      main_image: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      is_featured: true,
-      review_count: 0
-    },
-    {
-      title: "Luxury Poolside Villa",
-      description: "Indulge in luxury at this elegant villa with a private pool. Perfect for those seeking privacy and comfort in a beautiful setting.",
-      location: "Miami, Florida",
-      price: "420",
-      rating: "5.0",
-      bedrooms: 5,
-      bathrooms: 4,
-      main_image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      is_featured: true,
-      review_count: 0
-    },
-    {
-      title: "Urban Studio Loft",
-      description: "Stay in this trendy loft in the heart of the city. Great for solo travelers or couples looking to experience urban living at its finest.",
-      location: "Chicago, Illinois",
-      price: "150",
-      rating: "4.6",
-      bedrooms: 1,
-      bathrooms: 1,
-      main_image: "https://images.unsplash.com/photo-1493809842364-78817add7ffb?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      is_featured: true,
-      review_count: 0
     }
   ];
 
-  // Insert properties
-  const { data: propertyData, error: propertyError } = await supabase
-    .from('properties')
-    .upsert(properties, { onConflict: 'title' })
-    .select();
+  console.log('Attempting to add properties to Supabase...');
+  try {
+    // Insert properties
+    const { data: propertyData, error: propertyError } = await supabase
+      .from('properties')
+      .upsert(properties, { onConflict: 'title' })
+      .select();
 
-  if (propertyError) {
-    console.error('Error seeding properties:', propertyError);
-    return;
-  }
+    if (propertyError) {
+      console.error('Error seeding properties:', propertyError);
+      
+      // Let's try a simple insert to see if that works
+      const insertResult = await supabase
+        .from('properties')
+        .insert([{
+          title: "Test Property",
+          description: "Test description",
+          location: "Test location",
+          price: "100",
+          rating: "5.0",
+          bedrooms: 1,
+          bathrooms: 1,
+          main_image: "https://example.com/image.jpg",
+          is_featured: false,
+          review_count: 0
+        }]);
+      
+      console.log('Simple property insert test result:', insertResult);
+      return;
+    }
 
-  console.log(`Added ${propertyData.length} properties`);
+    console.log(`Added ${propertyData?.length || 0} properties`);
 
-  // Add property images
-  for (const property of propertyData) {
+    if (!propertyData || propertyData.length === 0) {
+      console.log('No properties added, skipping related data');
+      return;
+    }
+
+    // Add property images for the first property only for simplicity
+    const property = propertyData[0];
+    console.log('Working with property:', property);
+    
     const imageUrls = [
-      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
+      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
     ];
     
     const propertyImages = imageUrls.map(url => ({
@@ -193,6 +192,7 @@ async function seedProperties() {
       image_url: url
     }));
     
+    console.log('Attempting to add property images:', propertyImages);
     const { data: imageData, error: imageError } = await supabase
       .from('property_images')
       .upsert(propertyImages)
@@ -201,42 +201,10 @@ async function seedProperties() {
     if (imageError) {
       console.error(`Error adding images for property ${property.id}:`, imageError);
     } else {
-      console.log(`Added ${imageData.length} images for property ${property.id}`);
+      console.log(`Added ${imageData?.length || 0} images for property ${property.id}`);
     }
-    
-    // Get amenities
-    const { data: amenityData, error: amenityError } = await supabase
-      .from('amenities')
-      .select('id')
-      .limit(14);
-      
-    if (amenityError) {
-      console.error('Error fetching amenities:', amenityError);
-      continue;
-    }
-    
-    // Randomly select 4-6 amenities for each property
-    const numAmenities = Math.floor(Math.random() * 3) + 4; // 4-6 amenities
-    const selectedAmenityIds = amenityData
-      .sort(() => 0.5 - Math.random())
-      .slice(0, numAmenities)
-      .map(a => a.id);
-    
-    const propertyAmenities = selectedAmenityIds.map(amenityId => ({
-      property_id: property.id,
-      amenity_id: amenityId
-    }));
-    
-    const { data: paData, error: paError } = await supabase
-      .from('property_amenities')
-      .upsert(propertyAmenities)
-      .select();
-      
-    if (paError) {
-      console.error(`Error adding amenities for property ${property.id}:`, paError);
-    } else {
-      console.log(`Added ${paData.length} amenities for property ${property.id}`);
-    }
+  } catch (e) {
+    console.error('Exception adding properties or related data:', e);
   }
 }
 
