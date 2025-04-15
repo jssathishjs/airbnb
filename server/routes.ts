@@ -31,21 +31,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/properties/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const property = await storage.getProperty(id);
-      
-      if (!property) {
-        return res.status(404).json({ error: "Property not found" });
-      }
-      
-      res.json(property);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch property details" });
-    }
-  });
-
   app.get("/api/properties/search", async (req: Request, res: Response) => {
     try {
       const { 
@@ -82,6 +67,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(properties);
     } catch (error) {
       res.status(500).json({ error: "Failed to search properties" });
+    }
+  });
+
+  app.get("/api/properties/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const property = await storage.getProperty(id);
+      
+      if (!property) {
+        return res.status(404).json({ error: "Property not found" });
+      }
+      
+      res.json(property);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch property details" });
     }
   });
 
