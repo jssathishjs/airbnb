@@ -955,5 +955,7 @@ export class SupabaseStorage implements IStorage {
   }
 }
 
-// Use the SupabaseStorage implementation
-export const storage = new SupabaseStorage();
+// Use the MemStorage implementation for now, since we can't create tables in Supabase yet
+// Once the Supabase tables are properly set up in the dashboard, we can switch to:
+// export const storage = new SupabaseStorage();
+export const storage = new MemStorage();
